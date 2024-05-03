@@ -1,23 +1,32 @@
 #!/bin/bash
 
 check_installed() {
-	ssh -T git@github.com || [[ $? == 1 ]] || exit 1
+	ssh -T git@github.com
+	if [[ $? == 1 ]]; then
+		return 0
+	else
+		return 1
+	fi
 }
-
 check_installed && echo "already installed" && exit 0
 
-mkdir -p ~/.ssh/github && cd $_
+
+sudo apt install -y openssh-client
+
 
 # generate pub-pri key
-ssh-keygen -t ed25519 -f id_rsa
+mkdir -p ~/.ssh/github
+ssh-keygen -t ed25519 -f ~/.ssh/github/id_rsa
 
 echo "publish key"
-ssh-keygen -l -f id_rsa.pub
+ssh-keygen -l -f ~/.ssh/github/id_rsa.pub
 
-echo "📢 Please copy the following line (ssh key) and add it to GitHub"
-cat id_rsa.pub
+echo ""
+echo -e "\e[1m\e[92m📢 Please copy the following line (ssh key) and add it to GitHub\e[39m"
+cat ~/.ssh/github/id_rsa.pub
 
-echo "" && read -p "✅ Added yourt SSH key to GitHub? y[Yes], [n]No : " flag
+echo "" && echo -e "Registration URL: \e[45mhttps://github.com/settings/keys\e[49m"
+read -p "✅ Added yourt SSH key to GitHub? [y]Yes, [n]No : " flag
 if [ $flag != 'y' ]; then
 	rm -r ~/.ssh/github && echo "delete ~/.ssh/github"
 	exit 1

@@ -4,12 +4,12 @@
 sed -i 's/HISTFILESIZE=2000/HISTFILESIZE=20000/g' ~/.bashrc
 eval "$(cat ~/.bashrc | tail -n +10)"
 
-mkdir -p ~/App
+mkdir -p ~/Apps
 
 # AutoStart App setting
 mkdir -p ~/.config/autostart
-cp ./DB/gnome-terminal.desktop ~/.config/autostart/gnome-terminal.desktop
-vivaldi --version && cp ./DB/vivaldi.desktop ~/.config/autostart/vivaldi.desktop
+cp ./installer/DB/gnome-terminal.desktop ~/.config/autostart/gnome-terminal.desktop
+vivaldi --version && cp ./installer/DB/vivaldi.desktop ~/.config/autostart/vivaldi.desktop
 
 # bash completion
 sudo apt -y install bash-completion

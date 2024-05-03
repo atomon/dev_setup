@@ -1,12 +1,24 @@
 #!/bin/bash
+set -e
 
+sudo apt update && sudo apt install -y curl
+
+# Install apps by snap
+sudo snap install code --classic
 sudo snap install slack --classic
 sudo snap install discord
 
 # Install vivaldi
-curl -fSsL https://repo.vivaldi.com/archive/linux_signing_key.pub | sudo gpg --dearmor | sudo tee /etc/apt/keyrings/vivaldi.gpg >/dev/null
-echo deb [arch=amd64 signed-by=/etc/apt/keyrings/vivaldi.gpg] https://repo.vivaldi.com/archive/deb/ stable main | sudo tee /etc/apt/sources.list.d/vivaldi.list
-sudo apt update && sudo apt install -y vivaldi-stable
+which vivaldi >& /dev/null
+if [[ $? != 0 ]]; then
+	curl -fSsL https://repo.vivaldi.com/archive/linux_signing_key.pub -o /etc/apt/keyrings/vivaldi.asc
+	echo deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/vivaldi.asc] https://repo.vivaldi.com/archive/deb/ stable main | sudo tee /etc/apt/sources.list.d/vivaldi.list
+	sudo apt update && sudo apt install -y vivaldi-stable
+fi
 
 # Chech installed
-which slack && which discord && which vivaldi && echo "✨ Installed all apps!!"
+$(which slack && which discord && which vivaldi)
+if [[ $? == 0 ]]; then
+	printf "✨ Installed all apps!!\n"
+else
+	printf "\033[33m[ERROR] do not found apps\n" && exit 1

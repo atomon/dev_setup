@@ -9,18 +9,19 @@ fi
 
 
 # Install pipx ref: https://pipx.pypa.io/stable/installation/
+# required ubuntu23.04 or latest
 which pipx >& /dev/null
 if [[ $? != 0 ]]; then
-	sudo apt update && sudo apt install pipx && pipx ensurepath
+	sudo apt update && sudo apt install -y pipx && pipx ensurepath
 	printf "# Created by \`pipx\` on $(date "+%m-%d-%y %T %Z")\n" >> ~/.bashrc
-	printf 'eval "$(register-python-argcomplete3 pipx)"\n\n' >> ~/.bashrc
+	printf 'eval "$(register-python-argcomplete pipx)"\n\n' >> ~/.bashrc
 	eval "$(cat ~/.bashrc | tail -n +10)"
 fi
 
 
 # Install Poetry ref: https://python-poetry.org/docs/#installation
 pipx install poetry && poetry config virtualenvs.in-project true
-poetry completions bash >> ~/.local/share/bash-completion/poetry
+mkdir -p ~/.local/share/bash-completion && poetry completions bash > $_/poetry
 printf "# Created by \`poetry\` on $(date "+%m-%d-%y %T %Z")\n" >> ~/.bashrc
 printf 'source ~/.local/share/bash-completion/poetry\n\n' >> ~/.bashrc
 

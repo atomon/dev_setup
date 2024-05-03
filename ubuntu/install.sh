@@ -1,6 +1,12 @@
 #!/bin/bash
 # $ ./install.sh -i python
 
+if [[ ! -d installer ]]; then
+	printf "\033[33m[ERROR] \e[39mPlease execute it in \`install.sh\` folder, did you mean:\n"
+	printf "  command \`cd $( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P ) && ./install.sh -h\`\n"
+	exit 1
+fi
+
 # label=Path
 declare -A install_priority=(
 	["general_apps"]=general_apps
@@ -20,9 +26,9 @@ Usage:  install.sh [OPTIONS]
 
 Options:
 	-h, --help                        show command help
-    -i, --install string string ...   Name of patckage to install
-        --all                         install all\n
-		--dry                         will show list to install (do not install)
+	-i, --install string string ...   Name of patckage to install
+	    --all                         install all
+	    --dry                         will show list to install (do not install)\n
 EOF
 
 # Argument Parser
@@ -33,7 +39,8 @@ ArgumentParser(){
 	all=false
 	dry=false
 
-	while [ $# -gt 0 ]; do
+	while (( $# >= 0 )); do
+		
 		case "$1" in
  
 			-h|--help)
@@ -54,11 +61,19 @@ ArgumentParser(){
 			--dry)
 				dry=true
 				shift;;
+				
+			-l|--list)
+				echo "List of available tags"
+				for pkg in ${!install_priority[@]}; do
+					printf "\t$pkg\n"
+				done
+				exit 0;;
 
 			*)
-				printf "\033[33m[ERROR] Usage: install.sh [-i] [-a]\n"
-				exit 1
+				printf "\033[33m[ERROR] Usage: install.sh [-h] [-i] [--all]\n"
+				exit 1;;
 		esac
+		[[ $# == 0 ]] && break
 	done
 
 	eval "$ARGS=(
@@ -107,7 +122,8 @@ installed=()
 for pkg in ${!install_priority[@]}; do
 	find_name $pkg $install_list
 	if [[ ($? == 0 || $all == true) ]]; then
-		./installer/${install_priority[$pkg]}.sh && installed+=($pkg)
+		sudo chmod 755 ./installer/${install_priority[$pkg]}.sh
+		$_ && installed+=($pkg)
 	fi
 done
 printf "\n"
@@ -115,9 +131,12 @@ printf "\n"
 
 # Result step
 printf "✨✨✨ Installed package:\n"
-printf '\t%s\n' "${installed[@]}"
+printf '\t%s\n\n' "${installed[@]}"
 
 
-echo "🚪 Logout after 10 seconds"
-sleep 10s
-gnome-session-quit --no-prompt
+read -p "✅ Restart now? [y]Yes, [n]No : " flag
+if [[ $flag == 'y' ]]; then
+	echo "🚪 Logout after 3 seconds"
+	sleep 3s
+	gnome-session-quit --no-prompt
+fi
