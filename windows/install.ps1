@@ -1,3 +1,11 @@
+<#======================
+powershell version check
+======================#>
+if ( $Host.Version.Major -lt 7 ) {
+    echo "Required 7 or latest of PowerShell major verion"
+    exit 1
+}
+
 <#============
 Work directory
 ============#>
@@ -96,7 +104,7 @@ WARNING: It may not be the latest
 https://gnuwin32.sourceforge.net/packages/make.htm
 ================================================#>
 curl.exe -LO https://sourceforge.net/projects/gnuwin32/files/make/3.81/make-3.81.exe
-make-3.81.exe
+.\make-3.81.exe
 
 
 <#===============
@@ -110,6 +118,7 @@ pyenv global 3.12.1
 <#============
 Install Poetry
 ============#>
+winget install Python.Python.3.12
 (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
 $env:PATH += ";" + $env:APPDATA + "\Python\Scripts"
 poetry config virtualenvs.in-project true
@@ -158,6 +167,7 @@ Reboot is required!!
 "@
 
 $flag = Read-Host "Do you want to reboot immediately? Yes[y], No[n]"
+cd $path
 
 if ( $flag -eq "y" )
 {
