@@ -20,7 +20,7 @@ sudo chmod 755 ./python.sh && exit_code_python=$_
 
 # Install font
 git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ./cache/nerd-fonts
-sudo chmod 755 ./cache/nerd-fonts/install.sh && $_
+sudo chmod 755 ./cache/nerd-fonts/install.sh && $_ CascadiaCode
 
 
 # Install Neovim
