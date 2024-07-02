@@ -8,18 +8,20 @@ if [[ ! -d installer ]]; then
 fi
 
 # label=Path
-declare -A install_priority=(
-	["general_apps"]=general_apps
-	["ubuntu_setting"]=ubuntu_setting
-	["mozc"]=mozc
-	["github_ssh"]=github_ssh
-	["pyenv"]=utils/python/pyenv
-	["poetry"]=utils/python/poetry
-	["python"]=python
-	["docker"]=docker
-	["nodejs"]=nodejs
-	["astronvim"]=astronvim
+declare -A pkg_list=(
+	["1-general_apps"]=general_apps
+	["2-ubuntu_setting"]=ubuntu_setting
+	["3-mozc"]=mozc
+	["4-github_ssh"]=github_ssh
+	["5-pyenv"]=utils/python/pyenv
+	["6-poetry"]=utils/python/poetry
+	["7-python"]=python
+	["8-docker"]=docker
+	["9-nodejs"]=nodejs
+	["10-astronvim"]=astronvim
 )
+pkg_key_list=$(printf '%s\n' "${!pkg_list[@]}" | sort -n | xargs)
+
 
 read -r -d '' _help_option << EOF
 Usage:  install.sh [OPTIONS]
@@ -38,6 +40,7 @@ ArgumentParser(){
 	install=()
 	all=false
 	dry=false
+	quiet=""
 
 	while (( $# >= 0 )); do
 		
@@ -64,10 +67,14 @@ ArgumentParser(){
 				
 			-l|--list)
 				echo "List of available tags"
-				for pkg in ${!install_priority[@]}; do
+				for pkg in ${!pkg_list[@]}; do
 					printf "\t$pkg\n"
 				done
 				exit 0;;
+
+			-q|--quiet)
+				quiet=' > /dev/null'
+				shift;;
 
 			*)
 				printf "\033[33m[ERROR] Usage: install.sh [-h] [-i] [--all]\n"
@@ -80,6 +87,7 @@ ArgumentParser(){
 		["install"]=\"${install[@]}\"
 		["all"]=$all
 		["dry"]=$dry
+		["quiet"]=\"${quiet}\"
 	)"
 }
 
@@ -103,14 +111,18 @@ ArgumentParser args $@
 install_list=${args["install"]}
 all=${args["all"]}
 dry=${args["dry"]}
+quiet=${args["quiet"]}
 
 
 # Dry step
 if [[ $dry == true ]]; then
-	for pkg in ${!install_priority[@]}; do
-		find_name $pkg $install_list
+	printf "Install Packages List\n"
+	for pkg_key in ${pkg_key_list[@]}; do
+		pkg_name=${pkg_key#*-}
+
+		find_name $pkg_name $install_list
 		if [[ ($? == 0 || $all == true) ]]; then
-			printf "./installer/${install_priority[$pkg]}.sh\n"
+			printf "  $pkg_name  -->  ./installer/${pkg_list[$pkg_key]}.sh\n"
 		fi
 	done
 	exit 0
@@ -119,11 +131,14 @@ fi
 
 # Install step
 installed=()
-for pkg in ${!install_priority[@]}; do
-	find_name $pkg $install_list
+for pkg_key in ${pkg_key_list[@]}; do
+	pkg_name=${pkg_key#*-} 
+
+	find_name $pkg_name $install_list
 	if [[ ($? == 0 || $all == true) ]]; then
-		sudo chmod 755 ./installer/${install_priority[$pkg]}.sh
-		$_ && installed+=($pkg)
+		printf "Installing $pkg_name\n"
+		sudo chmod 755 ./installer/${pkg_list[$pkg_key]}.sh
+		eval $_ ${quiet} && installed+=(${pkg_name%\n})
 	fi
 done
 printf "\n"
@@ -131,10 +146,11 @@ printf "\n"
 
 # Result step
 printf "✨✨✨ Installed package:\n"
-printf '\t%s\n\n' "${installed[@]}"
+printf '\t%s\n' "${installed[@]}"
+printf '\n'
 
 
-read -p "✅ Restart now? [y]Yes, [n]No : " flag
+read -p "✅ Logout-Login now? [y]Yes, [n]No : " flag
 if [[ $flag == 'y' ]]; then
 	echo "🚪 Logout after 3 seconds"
 	sleep 3s
