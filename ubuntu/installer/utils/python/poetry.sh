@@ -8,15 +8,28 @@ if [[ $? == 0 ]]; then
 fi
 
 
+# Dependent Package
+sudo chmod 755 ./installer/utils/python/pyenv.sh && $_
+
+
 # Install pipx ref: https://pipx.pypa.io/stable/installation/
-# required ubuntu23.04 or latest
 which pipx >& /dev/null
 if [[ $? != 0 ]]; then
-	sudo apt update && sudo apt install -y pipx && pipx ensurepath
-	printf "# Created by \`pipx\` on $(date "+%m-%d-%y %T %Z")\n" >> ~/.bashrc
-	printf 'eval "$(register-python-argcomplete pipx)"\n\n' >> ~/.bashrc
-	eval "$(cat ~/.bashrc | tail -n +10)"
+	uname_v=$(uname -v)
+	majar_v=$(echo ${tes%%.*} | awk -F~ '{print $2}')
+
+	if [[ majar_v < 23 ]]; then
+		python3 -m pip install --user pipx
+		python3 -m pipx ensurepath
+	else
+		# required ubuntu23.04 or latest
+		sudo apt update && sudo apt install -y pipx && pipx ensurepath
+	fi
 fi
+
+printf "# Created by \`pipx\` on $(date "+%m-%d-%y %T %Z")\n" >> ~/.bashrc
+printf 'eval "$(register-python-argcomplete pipx)"\n\n' >> ~/.bashrc
+eval "$(cat ~/.bashrc | tail -n +10)"
 
 
 # Install Poetry ref: https://python-poetry.org/docs/#installation
