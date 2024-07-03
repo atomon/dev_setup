@@ -1,5 +1,11 @@
 #!/bin/bash
 
+$(which node >&/dev/null && which npm >&/dev/null)
+if [[ $? == 0 ]]; then
+	echo "✅ Poetry is already installed"
+	exit
+fi
+
 # Info
 echo "💻 Version Info of Node.js to be installed
    NVM: 0.39.7

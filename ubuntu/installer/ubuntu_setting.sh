@@ -19,6 +19,7 @@ if [ ! -f ~/.bash_aliases ]; then touch ~/.bash_aliases; fi
 
 # Set Aliases
 echo "alias reload='exec $SHELL -l'" >>~/.bash_aliases
+nvim -v && echo "alias v='nvim'" >>~/.bash_aliases
 
 # Set keyboard shortcuts
 # ref: https://unix.stackexchange.com/questions/174683/custom-global-keybindings-in-cinnamon-via-gsettings
