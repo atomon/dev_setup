@@ -2,7 +2,7 @@
 
 ## Requirements
 ### Microsoft Store
-- [App installer](https://apps.microsoft.com/detail/9nblggh4nns1?rtc=1&hl=en-us&gl=JP#activetab=pivot:overviewtab)
+- [App installer](https://apps.microsoft.com/detail/9nblggh4nns1?rtc=1&hl=en-us&gl=JP#activetab=pivot:overviewtab) (v1.8 or latest)
 
 <br>
 
@@ -75,3 +75,9 @@ GitHub アカウントなどの設定を行う
 ```ps
 .\astronvim_install.ps1 {User name of GitHub}
 ```
+
+<br>
+
+## Troubleshooting
+- winget
+  - if there is a `Failed when opening source(s); try the 'source reset' command if the problem persists`, update App Installer from Microsoft Store
