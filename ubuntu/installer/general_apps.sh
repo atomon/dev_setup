@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-sudo apt update && sudo apt install -y curl
+sudo apt update && sudo apt install -y curl wget vim git
 
 # Install apps by snap
 sudo snap install code --classic
