@@ -29,7 +29,7 @@ END
 
 
 # Verify that you can run docker
-docker run hello-world
+sudo docker run hello-world
 if [[ $? == 0 ]]; then
 	echo "✨ Sucessful docker instalation"
 else
