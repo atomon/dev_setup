@@ -11,7 +11,7 @@ sudo snap install discord
 # Install vivaldi
 which vivaldi >& /dev/null
 if [[ $? != 0 ]]; then
-	curl -fSsL https://repo.vivaldi.com/archive/linux_signing_key.pub -o /etc/apt/keyrings/vivaldi.asc
+	sudo curl -fSsL https://repo.vivaldi.com/archive/linux_signing_key.pub -o /etc/apt/keyrings/vivaldi.asc
 	echo deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/vivaldi.asc] https://repo.vivaldi.com/archive/deb/ stable main | sudo tee /etc/apt/sources.list.d/vivaldi.list
 	sudo apt update && sudo apt install -y vivaldi-stable
 fi
