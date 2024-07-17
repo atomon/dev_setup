@@ -41,9 +41,10 @@ while ( $flag -ne "y" )
 }
 
 echo "Host github.com`r`n  HostName github.com`r`n  User git`r`n  IdentityFile ~/.ssh/github/id_rsa`r`n  TCPKeepAlive yes`r`n  IdentitiesOnly yes" >> ~/.ssh/config
-ssh -T git@github.com
+ssh -T git@github.com 2>&1 | tee -V output
 
-if ( $? )
+$output=[string]$output
+if ( $output.Contains("You've successfully authenticated") )
 {
     echo @"
     
