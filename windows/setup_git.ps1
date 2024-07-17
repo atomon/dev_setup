@@ -1,3 +1,5 @@
+$orig_path=(pwd).path
+
 <#==============
 Install posh-git
 ==============#>
@@ -52,3 +54,5 @@ else
 {
     echo Error: don't connect ssh -T git@github.com
 }
+
+cd $orig_path
