@@ -31,17 +31,24 @@ ssh-keygen -l -f id_rsa.pub
 [string] $flag = "n"
 while ( $flag -ne "y" )
 {
-    echo "`r`nCopy the below SSH key and add it to GitHub"
-
+    Write-Host "`r`nCopy the below SSH key and add it to GitHub" -ForegroundColor green
     cat id_rsa.pub
+    
+    Write-Host "`r`nAccese https://github.com/settings/keys, and Add SSH key`r`n" -ForegroundColor green
     $flag = Read-Host "Added your SSH key to GitHub? [y]Yes, [n]No"
 }
 
 echo "Host github.com`r`n  HostName github.com`r`n  User git`r`n  IdentityFile ~/.ssh/github/id_rsa`r`n  TCPKeepAlive yes`r`n  IdentitiesOnly yes" >> ~/.ssh/config
 ssh -T git@github.com
 
-
-echo @"
-
-Successful installation! 😎 🎉 
-"@
+if ( $? )
+{
+    echo @"
+    
+    Successful installation! 😎 🎉 
+    "@
+}
+else
+{
+    echo Error: don't connect ssh -T git@github.com
+}
