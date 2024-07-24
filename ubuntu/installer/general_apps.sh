@@ -4,9 +4,16 @@ set -e
 sudo apt update && sudo apt install -y curl wget vim git
 
 # Install apps by snap
-sudo snap install code --classic
 sudo snap install slack --classic
 sudo snap install discord
+
+# Install vscode
+which code >& /dev/null
+if [[ $? != 0 ]]; then
+	sudo curl https://packages.microsoft.com/keys/microsoft.asc -o /etc/apt/keyrings/microsoft.asc
+	echo deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.asc] https://packages.microsoft.com/repos/vscode stable main  | sudo tee /etc/apt/sources.list.d/microsoft_vscode.list
+	sudo apt update && sudo apt install -y code
+fi
 
 # Install vivaldi
 which vivaldi >& /dev/null
