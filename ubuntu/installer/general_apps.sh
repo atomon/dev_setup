@@ -24,7 +24,7 @@ if [[ $? != 0 ]]; then
 fi
 
 # Chech installed
-$(which slack && which discord && which vivaldi)
+which slack && which discord && which code && which vivaldi
 if [[ $? == 0 ]]; then
 	printf "✨ Installed all apps!!\n"
 else

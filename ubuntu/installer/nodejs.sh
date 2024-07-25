@@ -28,3 +28,10 @@ node -v # should print `v20.12.2`
 
 # verifies the right NPM version is in the environment
 npm -v # should print `10.5.0`
+
+which node && which npm
+if [[ $? == 0 ]]; then
+	echo "✨ sucessful nodejs installation"
+else 
+	exit 1
+fi

@@ -28,6 +28,7 @@ Usage:  install.sh [OPTIONS]
 
 Options:
 	-h, --help                        show command help
+	-l, --list                        List of available pkgs
 	-i, --install string string ...   Name of patckage to install
 	    --all                         install all
 	    --dry                         will show list to install (do not install)\n
@@ -66,9 +67,9 @@ ArgumentParser(){
 				shift;;
 				
 			-l|--list)
-				echo "List of available tags"
-				for pkg in ${!pkg_list[@]}; do
-					printf "\t$pkg\n"
+				echo "List of available pkgs"
+				for pkg_key in ${pkg_key_list[@]}; do
+					printf "\t${pkg_key#*-} \n"
 				done
 				exit 0;;
 

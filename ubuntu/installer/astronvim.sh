@@ -1,4 +1,5 @@
 #!/bin/bash
+eval "$(cat ~/.bashrc | tail -n +10)"
 
 ################################################
 # # ./astronvim.sh <username of github (option)>
@@ -19,8 +20,8 @@ sudo chmod 755 ./python.sh && exit_code_python=$_
 
 
 # Install font
-git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ./cache/nerd-fonts
-sudo chmod 755 ./cache/nerd-fonts/install.sh && $_ CascadiaCode
+git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ./.temp/nerd-fonts
+sudo chmod 755 ./.temp/nerd-fonts/install.sh && $_
 
 
 # Install Neovim

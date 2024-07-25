@@ -1,5 +1,5 @@
 #!/bin/bash
-
+eval "$(cat ~/.bashrc | tail -n +10)"
 
 which poetry >& /dev/null
 if [[ $? == 0 ]]; then

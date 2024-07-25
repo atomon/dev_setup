@@ -9,7 +9,7 @@ mkdir -p ~/Apps
 # AutoStart App setting
 mkdir -p ~/.config/autostart
 cp ./installer/DB/gnome-terminal.desktop ~/.config/autostart/gnome-terminal.desktop
-vivaldi --version && cp ./installer/DB/vivaldi.desktop ~/.config/autostart/vivaldi.desktop
+which vivaldi  && cp ./installer/DB/vivaldi.desktop ~/.config/autostart/vivaldi.desktop
 
 # bash completion
 sudo apt -y install bash-completion
@@ -18,7 +18,7 @@ sudo apt -y install bash-completion
 if [ ! -f ~/.bash_aliases ]; then touch ~/.bash_aliases; fi
 
 # Set Aliases
-echo "alias reload='exec $SHELL -l'" >>~/.bash_aliases
+echo "alias reload='exec $SHELL -l'" >> ~/.bash_aliases
 
 # Set keyboard shortcuts
 # ref: https://unix.stackexchange.com/questions/174683/custom-global-keybindings-in-cinnamon-via-gsettings

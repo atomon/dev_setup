@@ -11,7 +11,7 @@ gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'mozc-jp')]"
 read -p "✅ Do you have custom-keymap file? [y]Yes, [n]No : " flag
 if [[ $flag == 'y' ]]; then
 	echo "=====================================================
-	📢 GUIが起動したら，DB/keymap_switch_en_jp.txt を import させる
+	📢 GUIが起動したら，dev_setup/ubuntu/installer/DB/keymap_switch_en_jp.txt を import させる
 		👣 General -> Keymap -> Keymap style -> Customize... -> Edit -> Import from file ...\"
 	"
 	/usr/lib/mozc/mozc_tool --mode=config_dialog
