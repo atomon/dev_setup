@@ -13,7 +13,7 @@ if [[ $? == 0 ]]; then
 fi
 
 # Install Requirement pkg
-sudo apt install -y build-essential cmake ripgrep xsel fuse3 cargo git
+sudo apt install -y build-essential cmake ripgrep xsel fuse3 cargo zip git
 sudo chmod 755 ./utils/nodejs.sh && exit_code_nodejs=$_
 sudo chmod 755 ./python.sh && exit_code_python=$_
 
