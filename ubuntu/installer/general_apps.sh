@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-sudo apt update && sudo apt install -y curl wget vim git
+sudo apt update && sudo apt install -y curl wget vim git gnome-sushi
 
 # Install apps by snap
 sudo snap install slack --classic
