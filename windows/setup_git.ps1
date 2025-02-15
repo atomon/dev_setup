@@ -46,14 +46,14 @@ ssh -T git@github.com 2>&1 | tee -V output
 $output=[string]$output
 if ( $output.Contains("You've successfully authenticated") )
 {
-    echo @"
-    
-    Successful installation! 😎 🎉 
-    "@
+echo @"
+
+Successful installation! 😎 🎉 
+"@
 }
 else
 {
-    echo Error: don't connect ssh -T git@github.com
+    echo "Error: don't connect ssh -T git@github.com"
 }
 
 cd $orig_path
