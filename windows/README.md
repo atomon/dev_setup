@@ -1,31 +1,37 @@
 # Development Environment (Windows 10+)
 
 ## Requirements
-### Microsoft Store
+#### Microsoft Store
 - [App installer](https://apps.microsoft.com/detail/9nblggh4nns1?rtc=1&hl=en-us&gl=JP#activetab=pivot:overviewtab) (v1.8 or latest)
 
 <br>
 
-### Set ExecutionPolicy
-1. 管理者権限で powershell を起動
-2. 実行ポリシーの確認
+## Setup Dependencies
+#### Set ExecutionPolicy
+1. The first step, Open terminal (PowerShell) in adminitrater mode.
+2. Check execution policy
     ```ps
-    # デフォルト設定は Restricted となっている
+    # Default is Restricted
     Get-ExecutionPolicy
 
-    # スコープごとに確認
+    # Check each scope
     Get-ExecutionPolicy -List
     ```
-3. 実行ポリシーの変更
+3. Change execution policy
     ```ps
-    # RemoteSigned に設定
+    # Set RemoteSigned
     Set-ExecutionPolicy RemoteSigned
     ```
 
 <br>
 
-### Install PowerShell (latest version)
-※ install スプリクトでは、PowerShell 7+ のバージョンが必要  
+#### Install Git
+```bash:
+winget install Git.Git
+```
+
+#### Install PowerShell (latest version)
+※ Install sprict require PowerShell 7+ version  
 （Add-Content コマンドで、utf8NoBOM エンコードを使うため）  
 ```ps
 # Install PowerShell
@@ -34,7 +40,7 @@ winget install Microsoft.PowerShell
 
 <br>
 
-### Setup Windows Terminal
+#### Install Windows Terminal
 Windows Terminal の設定から 最新の PowerShell が起動するように設定する  
 `settings.json` を読み込んで，ショートカットを設定する
 ```
@@ -49,13 +55,15 @@ echo $PSVersionTable
 > [!NOTE]
 >コマンドは，Windows Terminal（PowerShell 7+）で実行する
 
-1. このリポジトリの Windows ブランチを ZIP としてダウンロード
-2. ZIP を解凍
-3. 解凍した位置で Terminal を起動
+#### Clone repository
+```bash:
+mkdir -p $home/Documents/Github && cd $home/Documents/Github
+git clone https://github.com/atomon/dev_setup.git && cd dev_setup/windows
+```
 
 <br>
 
-### Development Environment
+#### Development Environment
 基本的なソフトをインストールする
 ```ps
 .\install.ps1
@@ -63,7 +71,7 @@ echo $PSVersionTable
 
 <br>
 
-### Setup Git
+#### Setup Git
 GitHub アカウントなどの設定を行う
 ```ps
 .\setup_git.ps1
@@ -71,9 +79,10 @@ GitHub アカウントなどの設定を行う
 
 <br>
 
-### AstroNvim
+#### AstroNvim
 ```ps
-.\astronvim_install.ps1 {User name of GitHub}
+.\install_astronvim.ps1
+git clone https://github.com/atomon/astronvim_config_v4.git $env:LOCALAPPDATA\nvim
 ```
 
 <br>
