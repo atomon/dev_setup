@@ -1,11 +1,3 @@
-<#=======
-Parameter
-
-$name: user name of GitHub
-=======#>
-Param([parameter(mandatory=$true)][string] $name)
-
-
 <#=============
 Install ripgrep
 =============#>
@@ -34,8 +26,6 @@ requirement
 fontは、win terminal の設定から変更
 =================================#>
 winget install Neovim.Neovim
-git clone --depth 1 https://github.com/AstroNvim/AstroNvim $env:LOCALAPPDATA\nvim
-git clone https://github.com/$name/astronvim_config.git $env:LOCALAPPDATA\nvim\lua\user
 Add-Content $PROFILE "Set-Alias v nvim" -Encoding utf8NoBOM
 
 
