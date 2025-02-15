@@ -9,7 +9,7 @@ Expand-Archive –Path $env:USERPROFILE\Downloads\flutter_windows_3.29.0-stable.
  <#=====================
  Add enviroment variable
  =====================#>
-$env:PATH += ";$env:USERPROFILE\dev\flutter\bin"
+$env:PATH = "$env:USERPROFILE\dev\flutter\bin;$env:PATH"
 [Environment]::SetEnvironmentVariable("PATH", $env:PATH, "User")
 
 git config --global --add safe.directory C:/Users/ryouh/dev/flutter
