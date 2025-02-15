@@ -50,12 +50,14 @@ Install App
 =========#>
 winget install CrystalDewWorld.CrystalDiskInfo
 winget install CrystalDewWorld.CrystalDiskMark
+winget install -e --id GnuWin32.Make
 winget install Microsoft.VisualStudioCode
 winget install SlackTechnologies.Slack
 winget install Discord.Discord
 winget install Vivaldi.Vivaldi
 winget install KiCad.KiCad
 winget install 7zip.7zip
+$env:PATH += ";C:\Program Files (x86)\GnuWin32\bin"
 $env:PATH += ";C:\Program Files\7-Zip"
 
 
@@ -97,39 +99,11 @@ mv .\mingw64 'C:\Program Files\'
 $env:PATH += ";C:\Program Files\mingw64\bin"
 
 
-<#================================================
-Install Make
-
-WARNING: It may not be the latest
-https://gnuwin32.sourceforge.net/packages/make.htm
-================================================#>
-curl.exe -LO https://sourceforge.net/projects/gnuwin32/files/make/3.81/make-3.81.exe
-.\make-3.81.exe
-
-
-<#===============
-Install pyenv-win
-===============#>
-Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
-pyenv install 3.12.1
-pyenv global 3.12.1
-
-
-<#============
-Install Poetry
-============#>
-winget install Python.Python.3.12
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
-$env:PATH += ";" + $env:APPDATA + "\Python\Scripts"
-poetry config virtualenvs.in-project true
-
-
-<#============
-Install Server
-============#>
-npm i -g zx
-winget install tailscale.tailscale
-
+<#========
+Install UV
+========#>
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+$env:Path += ";C:\Users\ryouh\.local\bin"
 
 <#=========
 Install WSL
@@ -171,5 +145,5 @@ cd $path
 
 if ( $flag -eq "y" )
 {
-    reboot
+    Restart-Computer
 }
