@@ -1,3 +1,10 @@
+<#===================
+Enable developer mode
+===================#>
+echo "Turn ON, Developer Mode"
+start ms-settings:developers
+
+
 <#==================
 Download flutter SDK
 ==================#>
@@ -13,3 +20,8 @@ $env:PATH = "$env:USERPROFILE\dev\flutter\bin;$env:PATH"
 [Environment]::SetEnvironmentVariable("PATH", $env:PATH, "User")
 
 git config --global --add safe.directory C:/Users/ryouh/dev/flutter
+
+<#=================
+Validate Enviroment
+=================#>
+flutter doctor
