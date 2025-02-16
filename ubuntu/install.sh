@@ -15,11 +15,13 @@ declare -A pkg_list=(
 	["4-github_ssh"]=github_ssh
 	["5-pyenv"]=utils/python/pyenv
 	["6-poetry"]=utils/python/poetry
-	["7-python"]=python
-	["8-docker"]=docker
-	["9-nodejs"]=nodejs
-	["10-astronvim"]=astronvim
+ 	["7-uv"]=util/python/uv
+	["8-python"]=python
+	["9-docker"]=docker
+	["10-nodejs"]=nodejs
+	["11-astronvim"]=astronvim
 )
+ignore_pkg_list="pyenv poetry"
 pkg_key_list=$(printf '%s\n' "${!pkg_list[@]}" | sort -n | xargs)
 
 
@@ -120,8 +122,9 @@ if [[ $dry == true ]]; then
 	for pkg_key in ${pkg_key_list[@]}; do
 		pkg_name=${pkg_key#*-}
 
-		find_name $pkg_name $install_list
-		if [[ ($? == 0 || $all == true) ]]; then
+		find_name $pkg_name $install_list; find_il=$?
+ 		find_name $pkg_name $ignore_pkg_list; find_igl=$?
+		if [[ ($find_il == 0 || ($all == true && $find_igl != 0 )) ]]; then
 			printf "  $pkg_name  -->  ./installer/${pkg_list[$pkg_key]}.sh\n"
 		fi
 	done
@@ -134,8 +137,9 @@ installed=()
 for pkg_key in ${pkg_key_list[@]}; do
 	pkg_name=${pkg_key#*-} 
 
-	find_name $pkg_name $install_list
-	if [[ ($? == 0 || $all == true) ]]; then
+	find_name $pkg_name $install_list; find_il=$?
+ 	find_name $pkg_name $ignore_pkg_list; find_igl=$?
+	if [[ ($find_il == 0 || ($all == true && $find_igl != 0 )) ]]; then
 		printf "Installing $pkg_name\n"
 		sudo chmod 755 ./installer/${pkg_list[$pkg_key]}.sh
 		eval $_ ${quiet} && installed+=(${pkg_name%\n})
