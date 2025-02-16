@@ -1,12 +1,11 @@
 #!/bin/bash
 
 
-sudo chmod 755 ./installer/utils/python/pyenv.sh && $_ && exit_code_pyenv=$?
-sudo chmod 755 ./installer/utils/python/poetry.sh && $_ && exit_code_poetry=$?
+sudo chmod 755 ./installer/utils/python/uv.sh && $_ && exit_code_uv=$?
 
 
 # Verify
-exit_code=$((exit_code_pyenv+exit_code_poetry))
+exit_code=$((exit_code_uv))
 if [[ $exit_code == 0 ]]; then
 	echo "✨✨ Sucessful Python env instalation"
 else
