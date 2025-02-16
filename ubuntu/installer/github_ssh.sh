@@ -1,5 +1,14 @@
 #!/bin/bash
 
+
+# Set git config
+echo -n "Enter your user name of GitHub: "; read git_name
+echo -n "Enter your email of GitHub: "; read git_email
+git config --global user.name $git_name
+git config --global user.email $git_email
+
+
+# Check installed
 check_installed() {
 	ssh -T git@github.com
 	if [[ $? == 1 ]]; then
