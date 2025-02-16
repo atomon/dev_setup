@@ -26,7 +26,7 @@ sudo chmod 755 ./cache/nerd-fonts/install.sh && $_ CascadiaCode
 # Install Neovim
 orig_path=$(pwd)
 mkdir -p ~/Apps/nvim && nvim_dir=$_ && cd $nvim_dir
-curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
 sudo chmod u+x ./nvim.appimage && $_ --version
 if [[ $? == 0 ]]; then
 	sudo ln -s $nvim_dir/nvim.appimage /usr/bin/nvim
