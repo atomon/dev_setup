@@ -1,0 +1,1 @@
+winget install Balena.Etcher
