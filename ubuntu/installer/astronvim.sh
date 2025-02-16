@@ -14,8 +14,7 @@ fi
 
 # Install Requirement pkg
 sudo apt install -y build-essential cmake ripgrep xsel fuse3 cargo zip git
-sudo chmod 755 ./utils/nodejs.sh && exit_code_nodejs=$_
-sudo chmod 755 ./python.sh && exit_code_python=$_
+sudo apt install -y python3 python3-venv
 
 
 # Install font
@@ -27,11 +26,11 @@ sudo chmod 755 ./cache/nerd-fonts/install.sh && $_ CascadiaCode
 orig_path=$(pwd)
 mkdir -p ~/Apps/nvim && nvim_dir=$_ && cd $nvim_dir
 curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
-sudo chmod u+x ./nvim.appimage && $_ --version
+sudo chmod u+x ./nvim-linux-x86_64.appimage && $_ --version
 if [[ $? == 0 ]]; then
-	sudo ln -s $nvim_dir/nvim.appimage /usr/bin/nvim
+	sudo ln -s $nvim_dir/nvim-linux-x86_64.appimage /usr/bin/nvim
 else
-	sudo ./nvim.appimage --appimage-extract >& /dev/null && sudo ln -s $nvim_dir/squashfs-root/usr/bin/nvim /usr/bin/nvim
+	sudo ./nvim-linux-x86_64.appimage --appimage-extract >& /dev/null && sudo ln -s $nvim_dir/squashfs-root/usr/bin/nvim /usr/bin/nvim
 fi
 cd $orig_path
 
