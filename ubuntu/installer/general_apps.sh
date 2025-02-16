@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 sudo apt update && sudo apt install -y curl wget vim git gnome-sushi
 
@@ -23,9 +22,12 @@ if [[ $? != 0 ]]; then
 	sudo apt update && sudo apt install -y vivaldi-stable
 fi
 
+sudo apt -y autoremove
+
 # Chech installed
-$(which slack && which discord && which vivaldi)
+which slack && which discord && which vivaldi
 if [[ $? == 0 ]]; then
 	printf "✨ Installed all apps!!\n"
+ 
 else
 	printf "\033[33m[ERROR] do not found apps\n" && exit 1
