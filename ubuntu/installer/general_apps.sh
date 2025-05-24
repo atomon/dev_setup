@@ -2,6 +2,10 @@
 
 sudo apt update && sudo apt install -y curl wget vim git gnome-sushi
 
+# Set config for git
+git config --global fetch.prune true
+git config pull.rebase true
+
 # Install apps by snap
 sudo snap install slack --classic
 sudo snap install discord
