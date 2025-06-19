@@ -8,23 +8,25 @@ fi
 
 # Info
 echo "💻 Version Info of Node.js to be installed
-   NVM: 0.39.7
-   Node.js: 20
-   npm: 10
+   NVM: 0.40.3
+   Node.js: 24
+   npm: 11
 ==========================================
 "
 
 sudo apt install -y curl
 
-# installs NVM (Node Version Manager)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-eval "$(cat ~/.bashrc | tail -n +10)"
+# Download and install nvm:
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+
+# in lieu of restarting the shell
+\. "$HOME/.nvm/nvm.sh"
 
 # download and install Node.js
-nvm install 20
+nvm install 24
 
 # verifies the right Node.js version is in the environment
-node -v # should print `v20.12.2`
+node -v # should print "v24.1.0".
 
 # verifies the right NPM version is in the environment
-npm -v # should print `10.5.0`
+npm -v # should print `11.3.0`
