@@ -2,6 +2,7 @@
 
 # Extend Command Histry
 sed -i 's/HISTFILESIZE=2000/HISTFILESIZE=20000/g' ~/.bashrc
+echo "export HISTTIMEFORMAT='%F %T  '" >> ~/.bashrc
 eval "$(cat ~/.bashrc | tail -n +10)"
 
 mkdir -p ~/Apps
