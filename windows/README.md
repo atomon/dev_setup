@@ -82,7 +82,7 @@ GitHub アカウントなどの設定を行う
 #### AstroNvim
 ```ps
 .\install_astronvim.ps1
-git clone https://github.com/atomon/astronvim_config_v4.git $env:LOCALAPPDATA\nvim
+git clone https://github.com/atomon/astronvim_v5.git $env:LOCALAPPDATA\nvim
 ```
 
 <br>
