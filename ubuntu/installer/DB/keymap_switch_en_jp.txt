@@ -49,8 +49,6 @@ Precomposition	Ctrl Space	IMEOff
 DirectInput	Ctrl Space	IMEOn
 Conversion	Ctrl Space	IMEOff
 Composition	Ctrl Space	IMEOff
-Composition	Ctrl Space	InsertHalfSpace
-Conversion	Ctrl Space	InsertHalfSpace
 Composition	Ctrl t	ConvertToHalfAlphanumeric
 Conversion	Ctrl t	ConvertToHalfAlphanumeric
 Composition	Ctrl u	ConvertToHiragana

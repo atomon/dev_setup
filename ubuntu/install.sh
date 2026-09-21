@@ -1,162 +1,101 @@
 #!/bin/bash
-# $ ./install.sh -i python
+set -euo pipefail
 
-if [[ ! -d installer ]]; then
-	printf "\033[33m[ERROR] \e[39mPlease execute it in \`install.sh\` folder, did you mean:\n"
-	printf "  command \`cd $( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P ) && ./install.sh -h\`\n"
-	exit 1
-fi
-
-# label=Path
-declare -A pkg_list=(
-	["1-general_apps"]=general_apps
-	["2-ubuntu_setting"]=ubuntu_setting
-	["3-mozc"]=mozc
-	["4-github_ssh"]=github_ssh
-	["5-pyenv"]=utils/python/pyenv
-	["6-poetry"]=utils/python/poetry
- 	["7-uv"]=util/python/uv
-	["8-python"]=python
-	["9-docker"]=docker
-	["10-nodejs"]=nodejs
-	["11-astronvim"]=astronvim
+# Keep a deterministic execution order and one registry for all modes.
+readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly -a PACKAGES=(general_apps ubuntu_setting mozc hazkey github_ssh python docker nvidia_container_toolkit nodejs astronvim)
+declare -Ar PACKAGE_PATHS=(
+    [general_apps]=general_apps [ubuntu_setting]=ubuntu_setting
+    [mozc]=mozc [hazkey]=hazkey [github_ssh]=github_ssh [python]=python
+    [docker]=docker [nvidia_container_toolkit]=nvidia_container_toolkit
+    [nodejs]=nodejs [astronvim]=astronvim
 )
-ignore_pkg_list="pyenv poetry"
-pkg_key_list=$(printf '%s\n' "${!pkg_list[@]}" | sort -n | xargs)
 
-
-read -r -d '' _help_option << EOF
-Usage:  install.sh [OPTIONS]
-
-Options:
-	-h, --help                        show command help
-	-i, --install string string ...   Name of patckage to install
-	    --all                         install all
-	    --dry                         will show list to install (do not install)\n
-EOF
-
-# Argument Parser
-ArgumentParser(){
-	ARGS=$1; shift
-
-	install=()
-	all=false
-	dry=false
-	quiet=""
-
-	while (( $# >= 0 )); do
-		
-		case "$1" in
- 
-			-h|--help)
-				printf "$_help_option"
-				exit 0;;
- 
-			-i|--install)
-				while [[ ! $2 =~ "-" && $# > 0 ]]; do
-					install+=($2)
-					shift
-				done
-				shift;;
-
-			--all)
-				all=true
-				shift;;
-
-			--dry)
-				dry=true
-				shift;;
-				
-			-l|--list)
-				echo "List of available tags"
-				for pkg in ${!pkg_list[@]}; do
-					printf "\t$pkg\n"
-				done
-				exit 0;;
-
-			-q|--quiet)
-				quiet=' > /dev/null'
-				shift;;
-
-			*)
-				printf "\033[33m[ERROR] Usage: install.sh [-h] [-i] [--all]\n"
-				exit 1;;
-		esac
-		[[ $# == 0 ]] && break
-	done
-
-	eval "$ARGS=(
-		["install"]=\"${install[@]}\"
-		["all"]=$all
-		["dry"]=$dry
-		["quiet"]=\"${quiet}\"
-	)"
+usage() {
+    cat <<'HELP'
+Usage: bash install.sh [OPTIONS]
+  -i, --install NAME ...  Install selected packages
+      --all              Install defaults (excludes hazkey and nvidia_container_toolkit)
+      --dry              Print selected scripts without running them
+  -l, --list             List available packages
+  -q, --quiet            Hide installer stdout (stderr remains visible)
+  -h, --help             Show this help
+HELP
 }
 
-
-# To check if it exists or not
-find_name(){
-	target=$1; shift
-	if ! printf '%s\n' "$@" | grep -qx $target; then
-		return 1
-	fi
-	return 0
+fail() {
+    printf '%s\n' "$*" >&2
+    exit 1
 }
 
+main() {
+    local all=false dry=false quiet=false name flag
+    local -A requested=()
+    local -a selected=() installed=() failed=()
+    while (( $# )); do
+        case "$1" in
+            -h|--help) usage; return ;;
+            -l|--list) printf '%s\n' "${PACKAGES[@]}"; return ;;
+            --all) all=true; shift ;;
+            --dry) dry=true; shift ;;
+            -q|--quiet) quiet=true; shift ;;
+            -i|--install)
+                shift
+                (( $# )) && [[ $1 != -* ]] || fail '--install requires at least one package name.'
+                while (( $# )) && [[ $1 != -* ]]; do
+                    name=$1
+                    [[ -n ${PACKAGE_PATHS[$name]:-} ]] || fail "Unknown package: $name"
+                    requested["$name"]=1
+                    shift
+                done
+                ;;
+            *) fail "Unknown option: $1" ;;
+        esac
+    done
 
-#####################################################
-# Main Script
-#####################################################
-declare -A args;
-ArgumentParser args $@
+    for name in "${PACKAGES[@]}"; do
+        if [[ -n ${requested[$name]:-} ]] ||
+            { [[ $all == true ]] && [[ $name != hazkey ]] && [[ $name != nvidia_container_toolkit ]]; }; then
+            selected+=("$name")
+        fi
+    done
+    (( ${#selected[@]} )) || fail 'Select packages with --install or --all. See --help.'
+    # Other legacy installers use paths relative to the repository root.
+    cd -- "$SCRIPT_DIR"
+    for name in "${selected[@]}"; do
+        [[ -f installer/${PACKAGE_PATHS[$name]}.sh ]] || fail "Missing installer: $name"
+    done
+    if [[ $dry == true ]]; then
+        for name in "${selected[@]}"; do
+            printf '  %s  -->  ./installer/%s.sh\n' "$name" "${PACKAGE_PATHS[$name]}"
+        done
+        return
+    fi
 
-install_list=${args["install"]}
-all=${args["all"]}
-dry=${args["dry"]}
-quiet=${args["quiet"]}
+    for name in "${selected[@]}"; do
+        printf 'Installing %s\n' "$name"
+        if [[ $quiet == true ]]; then
+            if bash "installer/${PACKAGE_PATHS[$name]}.sh" > /dev/null; then
+                installed+=("$name")
+            else
+                failed+=("$name")
+            fi
+        elif bash "installer/${PACKAGE_PATHS[$name]}.sh"; then
+            installed+=("$name")
+        else
+            failed+=("$name")
+        fi
+    done
+    if (( ${#installed[@]} )); then
+        printf 'Installed: %s\n' "${installed[@]}"
+    fi
+    if (( ${#failed[@]} )); then
+        printf 'Installation failed: %s\n' "${failed[@]}" >&2
+        return 1
+    fi
+    if [[ -t 0 ]] && read -r -p '✅ Logout-Login now? [y/N]: ' flag && [[ $flag == [yY] ]]; then
+        gnome-session-quit --no-prompt
+    fi
+}
 
-
-# Dry step
-if [[ $dry == true ]]; then
-	printf "Install Packages List\n"
-	for pkg_key in ${pkg_key_list[@]}; do
-		pkg_name=${pkg_key#*-}
-
-		find_name $pkg_name $install_list; find_il=$?
- 		find_name $pkg_name $ignore_pkg_list; find_igl=$?
-		if [[ ($find_il == 0 || ($all == true && $find_igl != 0 )) ]]; then
-			printf "  $pkg_name  -->  ./installer/${pkg_list[$pkg_key]}.sh\n"
-		fi
-	done
-	exit 0
-fi
-
-
-# Install step
-installed=()
-for pkg_key in ${pkg_key_list[@]}; do
-	pkg_name=${pkg_key#*-} 
-
-	find_name $pkg_name $install_list; find_il=$?
- 	find_name $pkg_name $ignore_pkg_list; find_igl=$?
-	if [[ ($find_il == 0 || ($all == true && $find_igl != 0 )) ]]; then
-		printf "Installing $pkg_name\n"
-		sudo chmod 755 ./installer/${pkg_list[$pkg_key]}.sh
-		eval $_ ${quiet} && installed+=(${pkg_name%\n})
-	fi
-done
-printf "\n"
-
-
-# Result step
-printf "✨✨✨ Installed package:\n"
-printf '\t%s\n' "${installed[@]}"
-printf '\n'
-
-
-read -p "✅ Logout-Login now? [y]Yes, [n]No : " flag
-if [[ $flag == 'y' ]]; then
-	echo "🚪 Logout after 3 seconds"
-	sleep 3s
-	gnome-session-quit --no-prompt
-fi
+main "$@"
