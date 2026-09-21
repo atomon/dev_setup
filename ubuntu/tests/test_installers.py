@@ -266,9 +266,13 @@ hazkey_main
         result = self.launcher('--dry', '-i', 'hazkey', 'mozc', 'hazkey')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([line.split()[0] for line in result.stdout.splitlines()], ['mozc', 'hazkey'])
+        result = self.launcher('--dry', '-i', 'ghostty')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ghostty  -->  ./installer/ghostty.sh', result.stdout)
         result = self.launcher('--all', '--dry')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('hazkey', result.stdout)
+        self.assertIn('ghostty', result.stdout)
         self.assertIn('installer/python.sh', result.stdout)
         self.assertNotIn('utils/python/', result.stdout)
 
@@ -327,6 +331,27 @@ ensure_docker_group_membership
         result = self.run_flow(docker_is_present=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text().splitlines(), ['verify-existing', 'group'])
+
+
+class GhosttyInstallerTests(unittest.TestCase):
+    def test_community_package_url_matches_only_the_requested_asset(self):
+        release_json = '''
+{"body":"https://github.com/mkasberg/ghostty-ubuntu/releases/download/no/ghostty_bad_amd64_24.04.deb",
+ "browser_download_url":"https://github.com/mkasberg/ghostty-ubuntu/releases/download/1.3.1-0-ppa2/ghostty_1.3.1-0~ppa2_amd64_24.04.deb",
+ "other":"https://github.com/mkasberg/ghostty-ubuntu/releases/download/1.3.1-0-ppa2/ghostty_1.3.1-0~ppa2_arm64_24.04.deb"}
+'''
+        command = '''source "$1"
+curl() { printf '%s' "$TEST_RELEASE_JSON"; }
+latest_deb_url amd64
+'''
+        result = subprocess.run(['bash', '-c', command, 'test',
+                                 str(ROOT / 'installer/ghostty.sh')],
+                                env=os.environ | {'TEST_RELEASE_JSON': release_json},
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(),
+                         'https://github.com/mkasberg/ghostty-ubuntu/releases/download/'
+                         '1.3.1-0-ppa2/ghostty_1.3.1-0~ppa2_amd64_24.04.deb')
 
 
 if __name__ == '__main__':

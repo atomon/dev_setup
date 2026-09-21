@@ -3,12 +3,12 @@ set -euo pipefail
 
 # Keep a deterministic execution order and one registry for all modes.
 readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly -a PACKAGES=(general_apps ubuntu_setting mozc hazkey github_ssh python docker nvidia_container_toolkit nodejs astronvim)
+readonly -a PACKAGES=(general_apps ubuntu_setting mozc hazkey github_ssh python docker nvidia_container_toolkit nodejs ghostty astronvim)
 declare -Ar PACKAGE_PATHS=(
     [general_apps]=general_apps [ubuntu_setting]=ubuntu_setting
     [mozc]=mozc [hazkey]=hazkey [github_ssh]=github_ssh [python]=python
     [docker]=docker [nvidia_container_toolkit]=nvidia_container_toolkit
-    [nodejs]=nodejs [astronvim]=astronvim
+    [nodejs]=nodejs [ghostty]=ghostty [astronvim]=astronvim
 )
 
 usage() {

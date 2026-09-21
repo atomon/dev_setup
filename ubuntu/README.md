@@ -115,6 +115,24 @@ The installer uses `wl-clipboard` in Wayland sessions and `xsel` otherwise.
 lazygit, gdu, and bottom remain optional tools and are not pulled in solely by
 AstroNvim.
 
+## Ghostty
+
+```bash
+bash install.sh -i ghostty
+```
+
+Ubuntu 26.04以降ではUbuntu公式リポジトリの `ghostty` パッケージを導入します。
+Ubuntu 24.04では、[Ghostty公式ドキュメント](https://ghostty.org/docs/install/binary#debian-and-ubuntu)
+で案内される `mkasberg/ghostty-ubuntu` の最新 `.deb` を一時ディレクトリへダウンロードして導入します。
+この `.deb` はコミュニティビルドであり、Ghosttyプロジェクトは公式・ディストリビューション提供の
+パッケージより信頼上のリスクが高いと明記しています。必要に応じてリリース内容を確認してから実行してください。
+
+導入後は `ghostty --version` で確認できます。設定ファイルは
+`${XDG_CONFIG_HOME:-~/.config}/ghostty/config` です。
+インストーラーは既定ターミナルもGhosttyへ変更します。Ubuntu 24.04ではシステムの
+`x-terminal-emulator` alternatives、26.04以降ではユーザーの
+`${XDG_CONFIG_HOME:-~/.config}/ubuntu-xdg-terminals.list` を設定します。
+
 ## NVIDIA GPU を Docker で使用する
 
 NVIDIA GPU と動作する NVIDIA ドライバ、および Docker を導入済みの場合は、次を
