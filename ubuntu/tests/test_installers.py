@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -416,6 +417,7 @@ fi''',
             self.assertIn('# >>> dev_setup tmux-agent-sidebar >>>', config.read_text())
             self.assertIn('set -g @sidebar_auto_create on', config.read_text())
             self.assertIn('set -g @sidebar_bottom_height 20', config.read_text())
+            self.assertIn(f"set -g @agent_sidebar_dir '{data}/tmux-agent-sidebar'", config.read_text())
             self.assertIn(str(data / 'tmux-agent-sidebar/tmux-agent-sidebar.tmux'), config.read_text())
             self.assertRegex(commands.read_text(), r'curl .*--output .*/bin/\.tmux-agent-sidebar\.')
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
@@ -432,14 +434,270 @@ fi''',
         self.assertIn('claude', result.stdout)
         self.assertIn('opencode', result.stdout)
 
-    def test_byobu_script_uses_ubuntu_packages_without_creating_user_configuration(self):
+    def test_byobu_script_configures_private_user_scoped_session_restore(self):
         script = ROOT / 'installer/byobu.sh'
         result = subprocess.run(['bash', '-n', str(script)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = script.read_text()
-        self.assertIn('apt=(sudo apt-get)', text)
-        self.assertIn('"${apt[@]}" install -y tmux byobu', text)
-        self.assertNotIn('mkdir ', text)
+        self.assertIn('sudo apt-get install -y tmux byobu', text)
+        self.assertIn("RESURRECT_VERSION='v4.0.0'", text)
+        self.assertIn("CONTINUUM_VERSION='v3.1.0'", text)
+        self.assertIn("set -g mouse on", text)
+        self.assertIn("set -g @resurrect-processes false", text)
+        self.assertIn("set -g @resurrect-capture-pane-contents on", text)
+        self.assertIn("set -g @resurrect-save-shell-history on", text)
+        self.assertIn("set -g @continuum-restore off", text)
+        self.assertIn("set -g @continuum-boot off", text)
+        self.assertIn("after-new-session[900]", text)
+        self.assertIn("#{DEV_SETUP_BYOBU_RESUME_SESSION}", text)
+        self.assertNotIn("@continuum-save-last-timestamp", text)
+        self.assertNotIn("@dev_setup-restore-after-attach-done", text)
+        self.assertIn('Run this installer as the target user, without sudo.', text)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / 'home'
+            data = root / 'data'
+            bin_dir = root / 'bin'
+            log = root / 'commands.log'
+            home.mkdir()
+            bin_dir.mkdir()
+            log.touch()
+            mocks = {
+                'apt-get': ':',
+                'byobu-tmux': ':',
+                'sudo': '[[ $1 == -v ]] && exit 0; "$@"',
+                'tmux': '[[ $1 == -V ]] && echo "tmux 3.4"',
+                'git': '''if [[ $1 == clone ]]; then
+    destination=${!#}
+    mkdir -p "$destination/.git"
+elif [[ $1 == -C && $3 == rev-parse ]]; then
+    if [[ ${TEST_PLUGIN_COMMIT:-} == bad ]]; then
+        echo bad
+    elif [[ $2 == *tmux-resurrect* ]]; then
+        echo e87d7d592cac97fa38c12395ebec042c154a1844
+    else
+        echo 46e0e0023476018ddb4cc0d44783eede27e5a8ec
+    fi
+fi''',
+            }
+            for name, body in mocks.items():
+                command = bin_dir / name
+                command.write_text(f'#!/usr/bin/env bash\nprintf "{name} %s\\n" "$*" >> "$TEST_LOG"\n{body}\n')
+                command.chmod(0o755)
+            env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
+                                'TEST_LOG': str(log), 'TMUX': '',
+                                'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
+            result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('WARNING: Saved pane contents and shell history are unencrypted', result.stdout)
+            config = home / '.byobu/.tmux.conf'
+            self.assertIn('# >>> dev_setup byobu-session-restore >>>', config.read_text())
+            self.assertIn('set -g mouse on', config.read_text())
+            self.assertIn(f"set -g @resurrect-dir '{data}/tmux/resurrect'", config.read_text())
+            self.assertIn('set -g @resurrect-processes false', config.read_text())
+            self.assertIn('set -g @resurrect-capture-pane-contents on', config.read_text())
+            self.assertIn('set -g @resurrect-save-shell-history on', config.read_text())
+            self.assertIn('set -g @continuum-save-interval 3', config.read_text())
+            self.assertIn('set -g @continuum-save-interval 0', config.read_text())
+            self.assertIn('set -g @continuum-restore off', config.read_text())
+            self.assertIn('after-new-session[900]', config.read_text())
+            self.assertIn('#{DEV_SETUP_BYOBU_RESUME_SESSION}', config.read_text())
+            self.assertNotIn('@continuum-save-last-timestamp', config.read_text())
+            helper = data / 'byobu-session-restore/restore-after-attach.sh'
+            self.assertTrue(helper.exists())
+            self.assertEqual(stat.S_IMODE(helper.stat().st_mode), 0o700)
+            resume = home / '.local/bin/byobu-resume'
+            self.assertTrue(resume.exists())
+            self.assertEqual(stat.S_IMODE(resume.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE((data / 'tmux/resurrect').stat().st_mode), 0o700)
+            self.assertEqual(sum(line.startswith('git clone') for line in log.read_text().splitlines()), 2)
+            result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(sum(line.startswith('git clone') for line in log.read_text().splitlines()), 2)
+            self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-byobu-session-restore.*')))
+
+            failed = subprocess.run(['bash', str(script)], env=env | {'TEST_PLUGIN_COMMIT': 'bad'},
+                                    capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn('not the expected', failed.stderr)
+            self.assertTrue(config.exists())
+
+    def test_byobu_restore_waits_for_client_and_reuses_saved_session_name(self):
+        helper = ROOT / 'installer/utils/byobu_restore_after_attach.sh'
+        result = subprocess.run(['bash', '-n', str(helper)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / 'home'
+            bin_dir = root / 'bin'
+            resurrect = root / 'resurrect'
+            log = root / 'tmux.log'
+            restored = root / 'restored'
+            home.mkdir()
+            bin_dir.mkdir()
+            resurrect.mkdir()
+            (resurrect / 'last').write_text('state\t1\t\n')
+
+            restore = root / 'restore.sh'
+            restore.write_text('#!/usr/bin/env bash\ntouch "$TEST_RESTORED"\n')
+            restore.chmod(0o700)
+            tmux = bin_dir / 'tmux'
+            tmux.write_text('''#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$TEST_LOG"
+case "$*" in
+  'show-environment -g DEV_SETUP_BYOBU_RESUME_SESSION') printf 'DEV_SETUP_BYOBU_RESUME_SESSION=1\\n' ;;
+  'show-option -gqv @resurrect-dir') printf '%s\\n' "$TEST_RESURRECT" ;;
+  'show-option -gqv @resurrect-restore-script-path') printf '%s\\n' "$TEST_RESTORE" ;;
+  'list-sessions -F #{session_name}') printf '2\\n' ;;
+  'has-session -t =1') exit 1 ;;
+esac
+''')
+            tmux.chmod(0o700)
+            env = os.environ | {
+                'HOME': str(home),
+                'PATH': f'{bin_dir}:{os.environ["PATH"]}',
+                'TEST_LOG': str(log),
+                'TEST_RESURRECT': str(resurrect),
+                'TEST_RESTORE': str(restore),
+                'TEST_RESTORED': str(restored),
+            }
+            result = subprocess.run(['bash', str(helper)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(restored.exists())
+            self.assertIn('rename-session -t =2 1', log.read_text())
+
+            restore.write_text('#!/usr/bin/env bash\nexit 42\n')
+            log.write_text('')
+            result = subprocess.run(['bash', str(helper)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 42, result.stderr)
+            self.assertNotIn('set-option -g @continuum-save-interval 3', log.read_text())
+
+    def test_byobu_restore_replaces_saved_sidebar_with_one_fresh_sidebar(self):
+        helper = ROOT / 'installer/utils/byobu_restore_after_attach.sh'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / 'home'
+            bin_dir = root / 'bin'
+            resurrect = root / 'resurrect'
+            sidebar_dir = root / 'sidebar'
+            tmux_log = root / 'tmux.log'
+            sidebar_log = root / 'sidebar.log'
+            restored = root / 'restored'
+            for directory in (home, bin_dir, resurrect, sidebar_dir):
+                directory.mkdir()
+            (sidebar_dir / 'agent-sidebar.conf').touch()
+            (resurrect / 'last').write_text(
+                'pane\t1\t0\t1\t:*\t0\ttitle\t:/tmp\t0\ttmux-agent-sidebar\t:\n'
+                'pane\t1\t0\t1\t:*\t1\ttitle\t:/tmp\t1\tbash\t:\n'
+                'pane\t1\t1\t0\t:-\t0\ttitle\t:/work\t0\ttmux-agent-sidebar\t:\n'
+                'pane\t1\t1\t0\t:-\t1\ttitle\t:/work\t1\tbash\t:\n'
+                'state\t1\t\n')
+
+            restore = root / 'restore.sh'
+            restore.write_text('#!/usr/bin/env bash\ntouch "$TEST_RESTORED"\n')
+            restore.chmod(0o700)
+            sidebar = sidebar_dir / 'sidebar-bin'
+            sidebar.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$TEST_SIDEBAR_LOG"\n')
+            sidebar.chmod(0o700)
+            tmux = bin_dir / 'tmux'
+            tmux.write_text('''#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$TEST_TMUX_LOG"
+case "$*" in
+  'show-environment -g DEV_SETUP_BYOBU_RESUME_SESSION') printf 'DEV_SETUP_BYOBU_RESUME_SESSION=1\\n' ;;
+  'show-option -gqv @resurrect-dir') printf '%s\\n' "$TEST_RESURRECT" ;;
+  'show-option -gqv @resurrect-restore-script-path') printf '%s\\n' "$TEST_RESTORE" ;;
+  'show-option -gqv @agent_sidebar_dir') printf '%s\\n' "$TEST_SIDEBAR_DIR" ;;
+  'show-option -gqv @agent_sidebar_bin') printf '%s\\n' "$TEST_SIDEBAR_BIN" ;;
+  'show-option -gqv @sidebar_auto_create') printf 'on\\n' ;;
+  'list-panes -a -F #{pane_id}|#{@pane_role}') printf '%%90|sidebar\\n%%91|\\n' ;;
+  'list-sessions -F #{session_name}') printf '2\\n' ;;
+  'has-session -t =1') exit 1 ;;
+  'display-message -p -t 1:0.0 #{window_panes}') printf '2\\n' ;;
+  'display-message -p -t 1:1.0 #{window_panes}') printf '2\\n' ;;
+  'list-windows -a -F #{window_id}|#{pane_current_path}') printf '@1|/tmp\\n@2|/work\\n' ;;
+esac
+''')
+            tmux.chmod(0o700)
+            env = os.environ | {
+                'HOME': str(home),
+                'PATH': f'{bin_dir}:{os.environ["PATH"]}',
+                'TEST_TMUX_LOG': str(tmux_log),
+                'TEST_SIDEBAR_LOG': str(sidebar_log),
+                'TEST_RESURRECT': str(resurrect),
+                'TEST_RESTORE': str(restore),
+                'TEST_RESTORED': str(restored),
+                'TEST_SIDEBAR_DIR': str(sidebar_dir),
+                'TEST_SIDEBAR_BIN': str(sidebar),
+            }
+            result = subprocess.run(['bash', str(helper)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(restored.exists())
+            calls = tmux_log.read_text()
+            self.assertIn('kill-pane -t %90', calls)
+            self.assertIn('kill-pane -t 1:0.0', calls)
+            self.assertIn('kill-pane -t 1:1.0', calls)
+            self.assertNotIn('pane_start_command', calls)
+            self.assertEqual(sidebar_log.read_text(),
+                             'toggle --create-only @1 /tmp\ntoggle --create-only @2 /work\n')
+
+    def test_byobu_resume_explicitly_requests_latest_snapshot(self):
+        resume = ROOT / 'installer/utils/byobu_resume.sh'
+        result = subprocess.run(['bash', '-n', str(resume)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / 'home'
+            data = root / 'data'
+            bin_dir = root / 'bin'
+            log = root / 'commands.log'
+            (data / 'tmux/resurrect').mkdir(parents=True)
+            home.mkdir()
+            bin_dir.mkdir()
+            (data / 'tmux/resurrect/last').write_text(
+                'pane\t7\t0\t1\t:*\t0\ttitle\t:/tmp\t1\tbash\t:\n'
+                'state\t\t\n')
+
+            tmux = bin_dir / 'tmux'
+            tmux.write_text('''#!/usr/bin/env bash
+printf 'tmux %s\\n' "$*" >> "$TEST_LOG"
+[[ $1 != list-sessions ]]
+''')
+            tmux.chmod(0o700)
+            byobu = bin_dir / 'byobu-tmux'
+            byobu.write_text('''#!/usr/bin/env bash
+printf 'byobu %s resume=%s\\n' "$*" "${DEV_SETUP_BYOBU_RESUME_SESSION:-}" >> "$TEST_LOG"
+''')
+            byobu.chmod(0o700)
+            env = os.environ | {
+                'HOME': str(home),
+                'XDG_DATA_HOME': str(data),
+                'TEST_LOG': str(log),
+                'PATH': f'{bin_dir}:{os.environ["PATH"]}',
+                'TMUX': '',
+            }
+            result = subprocess.run(['bash', str(resume)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('byobu  resume=7', log.read_text())
+
+            tmux.write_text('''#!/usr/bin/env bash
+printf 'tmux %s\\n' "$*" >> "$TEST_LOG"
+[[ $1 == list-sessions ]] && exit 0
+[[ $1 == has-session ]] && exit 1
+''')
+            tmux.chmod(0o700)
+            log.write_text('')
+            result = subprocess.run(['bash', str(resume)], env=env,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('already running without saved session 7', result.stderr)
+            self.assertNotIn('byobu ', log.read_text())
 
     def test_hook_script_merges_codex_and_links_opencode_in_user_home(self):
         with tempfile.TemporaryDirectory() as temp:

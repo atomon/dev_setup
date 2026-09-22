@@ -136,17 +136,36 @@ Ubuntu 24.04では、[Ghostty公式ドキュメント](https://ghostty.org/docs/
 ## Byobu + tmux-agent-sidebar
 
 ```bash
-# 管理者が一度だけ実行（sudo により Ubuntu の tmux / Byobu パッケージを導入）
+# 利用者が実行（APT操作だけ sudo。sudo bash では実行しない）
 bash install.sh -i byobu
 
 # 各利用者が実行（ホームディレクトリ内だけを変更）
 bash install.sh -i tmux_agent_sidebar
 ```
 
-Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ導入します。管理者が
-`sudo apt update && sudo apt install -y tmux byobu` を実行済みなら、`byobu` installerは不要です。
-Byobu の表示・キーバインド・tmux設定は利用者ごとの `~/.byobu/`（tmux backendでは
-`~/.byobu/.tmux.conf`）に保存されるため、共有リモートでも各自で独立して調整できます。
+Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ導入します。`byobu`
+installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するため、`sudo bash` では
+実行しません。共有リモートでも、各ユーザーの設定と保存データは独立しています。
+
+Byobu installer は `tmux-resurrect` と `tmux-continuum` を
+`${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。3分ごとに
+session/window/pane構成と作業ディレクトリを `${XDG_DATA_HOME:-~/.local/share}/tmux/resurrect/`
+へ保存します。通常の `byobu-tmux` は新規sessionを開始し、`byobu-resume` を実行した場合だけ
+最新の `last` を復元します。既存tmux serverに保存済みsessionがなければ、安全のため復元せず
+エラーにします。保存先は owner 専用で、
+既定の `~/.tmux/resurrect/` ではありません。
+`byobu-resume` で起動したtmux serverは復元完了まで自動保存を停止し、復元失敗時に空sessionで正常な
+保存データを上書きしないようにします。復元処理終了後は3分間隔の自動保存を再開します。
+tmux-agent-sidebarを併用する場合は、復元中の自動生成hookを一時停止し、保存されていたsidebar
+paneを破棄してから各windowに1つだけsidebarを再生成します。
+paneの画面内容とshell historyも保存・復元します。ただし、これらは暗号化されず、画面や
+コマンド履歴に表示されたcredential、token、顧客情報などの機密情報を含む可能性があります。
+保存先ディレクトリはowner専用です。
+AI agentのprocessや会話状態は保存・再実行しないため、Codex/Claude/OpenCodeが復元時に
+自動起動して外部サービスへ接続することはありません。初回導入時のみGitHubからpluginを取得します。
+tmuxのmouse modeも有効になるため、paneの選択・リサイズ・スクロールをマウスで操作できます。
+手動保存は `Ctrl-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
+`byobu-resume` を実行します。`Ctrl-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
 
 tmux-agent-sidebar v0.13.0 は
 `${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの

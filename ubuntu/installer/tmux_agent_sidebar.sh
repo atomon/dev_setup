@@ -78,7 +78,8 @@ main() {
     config_input=/dev/null
     [[ ! -f $config_file ]] || config_input=$config_file
     config_temp=$(mktemp "$config_dir/.tmux-agent-sidebar.XXXXXX") || die 'Could not create a temporary configuration file.'
-    if ! awk -v script="$install_dir/tmux-agent-sidebar.tmux" '
+    if ! awk -v install_dir="$install_dir" \
+        -v script="$install_dir/tmux-agent-sidebar.tmux" '
         /^# >>> dev_setup tmux-agent-sidebar >>>$/ { managed = 1; next }
         /^# <<< dev_setup tmux-agent-sidebar <<<$/ { managed = 0; next }
         !managed { print }
@@ -88,6 +89,7 @@ main() {
             print "set -g @sidebar_bottom_height 20"
             print "set -g @sidebar_notifications off"
             print "set -g @agent-sidebar-default-agent codex"
+            print "set -g @agent_sidebar_dir \047" install_dir "\047"
             print "run-shell \047" script "\047"
             print "# <<< dev_setup tmux-agent-sidebar <<<"
         }
