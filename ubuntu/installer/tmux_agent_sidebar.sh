@@ -17,7 +17,7 @@ die() {
 }
 
 main() {
-    local data_home install_dir config_dir config_file temporary_dir binary_name binary_sha256
+    local data_home install_dir config_dir config_file temporary_dir binary_temp binary_name binary_sha256
     local tmux_version tmux_major tmux_minor config_temp backup config_input
 
     (( EUID != 0 )) || die 'Run this installer as the target user, without sudo.'
@@ -49,6 +49,9 @@ main() {
     install_dir="$data_home/tmux-agent-sidebar"
     config_dir="$HOME/.byobu"
     config_file="$config_dir/.tmux.conf"
+    temporary_dir=''
+    binary_temp=''
+    trap '[[ -z ${temporary_dir:-} ]] || rm -rf -- "$temporary_dir"; [[ -z ${binary_temp:-} ]] || rm -f -- "$binary_temp"' EXIT
     mkdir -p -- "$data_home" "$config_dir"
 
     if [[ -e $install_dir ]] && [[ $(git -C "$install_dir" rev-parse HEAD 2>/dev/null || true) != "$SIDEBAR_COMMIT" ]]; then
@@ -56,7 +59,6 @@ main() {
     fi
     if [[ ! -d $install_dir/.git ]]; then
         temporary_dir=$(mktemp -d "$data_home/.tmux-agent-sidebar.XXXXXX") || die 'Could not create a temporary directory.'
-        trap '[[ -z ${temporary_dir:-} ]] || rm -rf -- "$temporary_dir"' EXIT
         git clone --depth 1 --branch "$SIDEBAR_VERSION" "$SIDEBAR_REPOSITORY" "$temporary_dir"
         [[ $(git -C "$temporary_dir" rev-parse HEAD) == "$SIDEBAR_COMMIT" ]] || die 'The checked-out source does not match the expected release commit.'
         mv -- "$temporary_dir" "$install_dir"
@@ -64,11 +66,14 @@ main() {
     fi
 
     mkdir -p -- "$install_dir/bin"
+    binary_temp=$(mktemp "$install_dir/bin/.tmux-agent-sidebar.XXXXXX") || die 'Could not create a temporary sidebar binary.'
     curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 \
-        --output "$install_dir/bin/tmux-agent-sidebar" "$SIDEBAR_RELEASE_BASE/$binary_name"
-    printf '%s  %s\n' "$binary_sha256" "$install_dir/bin/tmux-agent-sidebar" | sha256sum --check --status || \
+        --output "$binary_temp" "$SIDEBAR_RELEASE_BASE/$binary_name"
+    printf '%s  %s\n' "$binary_sha256" "$binary_temp" | sha256sum --check --status || \
         die 'tmux-agent-sidebar binary checksum verification failed.'
-    chmod 0755 -- "$install_dir/bin/tmux-agent-sidebar"
+    chmod 0755 -- "$binary_temp"
+    mv -- "$binary_temp" "$install_dir/bin/tmux-agent-sidebar"
+    binary_temp=''
 
     config_input=/dev/null
     [[ ! -f $config_file ]] || config_input=$config_file
@@ -79,8 +84,8 @@ main() {
         !managed { print }
         END {
             print "# >>> dev_setup tmux-agent-sidebar >>>"
-            print "set -g @sidebar_auto_create off"
-            print "set -g @sidebar_bottom_height 0"
+            print "set -g @sidebar_auto_create on"
+            print "set -g @sidebar_bottom_height 20"
             print "set -g @sidebar_notifications off"
             print "set -g @agent-sidebar-default-agent codex"
             print "run-shell \047" script "\047"

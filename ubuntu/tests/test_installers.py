@@ -414,7 +414,10 @@ fi''',
             self.assertEqual(result.returncode, 0, result.stderr)
             config = home / '.byobu/.tmux.conf'
             self.assertIn('# >>> dev_setup tmux-agent-sidebar >>>', config.read_text())
+            self.assertIn('set -g @sidebar_auto_create on', config.read_text())
+            self.assertIn('set -g @sidebar_bottom_height 20', config.read_text())
             self.assertIn(str(data / 'tmux-agent-sidebar/tmux-agent-sidebar.tmux'), config.read_text())
+            self.assertRegex(commands.read_text(), r'curl .*--output .*/bin/\.tmux-agent-sidebar\.')
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
             result = subprocess.run(['bash', str(installer)], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

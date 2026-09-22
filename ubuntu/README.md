@@ -155,9 +155,10 @@ SHA-256とソースの固定commitを検証します。Byobu設定は `~/.byobu/
 タイムスタンプ付きでバックアップします。共有リモートホストでも、他ユーザーの
 設定やシステムパッケージには触れません。
 
-ByobuのScreen backendは対象外です。既存layoutへの影響を避けるため、sidebarの自動作成、通知、
-下部Activity/Gitパネルは初期状態で無効です。
-`byobu-tmux` を起動して `Ctrl-a e` でsidebarを表示してください。
+ByobuのScreen backendは対象外です。sidebarは新規windowに自動作成されます。下部の
+Activity/Gitパネルは20行で表示され、sidebar内で `Shift+Tab` を押すと切り替えられます。
+通知は初期状態で無効です。既存windowにも表示するには `byobu-tmux` を起動して
+`Ctrl-a E` を押してください（大文字の `E`）。
 
 agent連携は別スクリプトで、必要なものだけ有効にします。
 
