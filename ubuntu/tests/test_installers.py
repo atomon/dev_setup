@@ -269,9 +269,18 @@ hazkey_main
         result = self.launcher('--dry', '-i', 'ghostty')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('ghostty  -->  ./installer/ghostty.sh', result.stdout)
+        result = self.launcher('--dry', '-i', 'tmux_agent_sidebar')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('tmux_agent_sidebar  -->  ./installer/tmux_agent_sidebar.sh', result.stdout)
+        result = self.launcher('--dry', '-i', 'byobu', 'tmux_agent_sidebar')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split()[0] for line in result.stdout.splitlines()],
+                         ['byobu', 'tmux_agent_sidebar'])
         result = self.launcher('--all', '--dry')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('hazkey', result.stdout)
+        self.assertNotIn('byobu  -->', result.stdout)
+        self.assertNotIn('tmux_agent_sidebar', result.stdout)
         self.assertIn('ghostty', result.stdout)
         self.assertIn('installer/python.sh', result.stdout)
         self.assertNotIn('utils/python/', result.stdout)
@@ -352,6 +361,117 @@ latest_deb_url amd64
         self.assertEqual(result.stdout.strip(),
                          'https://github.com/mkasberg/ghostty-ubuntu/releases/download/'
                          '1.3.1-0-ppa2/ghostty_1.3.1-0~ppa2_amd64_24.04.deb')
+
+
+class TmuxAgentSidebarInstallerTests(unittest.TestCase):
+    def test_scripts_are_syntax_valid_and_keep_changes_in_the_user_home(self):
+        installer = ROOT / 'installer/tmux_agent_sidebar.sh'
+        hooks = ROOT / 'installer/tmux_agent_sidebar_hooks.sh'
+        for script in (installer, hooks):
+            result = subprocess.run(['bash', '-n', str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotRegex(script.read_text(), r'(^|\n)\s*sudo\b')
+        text = installer.read_text()
+        self.assertIn("SIDEBAR_VERSION='v0.13.0'", text)
+        self.assertIn("SIDEBAR_COMMIT='d89fe2025cd3f7149b0c8af9d48f15eab5fc2a3a'", text)
+        self.assertIn('XDG_DATA_HOME', text)
+        self.assertIn('$HOME/.byobu', text)
+        self.assertIn('sha256sum --check --status', text)
+
+    def test_installer_writes_only_user_scoped_byobu_configuration(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            bin_dir = root / 'bin'
+            home = root / 'home'
+            data = root / 'data'
+            bin_dir.mkdir()
+            home.mkdir()
+            commands = root / 'commands.log'
+            commands.touch()
+            mocks = {
+                'byobu-tmux': ':',
+                'tmux': 'if [[ $1 == -V ]]; then echo "tmux 3.4"; fi',
+                'git': '''if [[ $1 == clone ]]; then
+    destination=${!#}
+    mkdir -p "$destination/.git" "$destination/.opencode/plugins"
+    touch "$destination/tmux-agent-sidebar.tmux" "$destination/hook.sh" \\
+        "$destination/.opencode/plugins/tmux-agent-sidebar.js"
+elif [[ $1 == -C ]]; then
+    echo d89fe2025cd3f7149b0c8af9d48f15eab5fc2a3a
+fi''',
+                'curl': 'while (( $# )); do [[ $1 == --output ]] && { touch "$2"; break; }; shift; done',
+                'sha256sum': '[[ $1 == --check ]] && { cat >/dev/null; exit 0; }',
+            }
+            for name, body in mocks.items():
+                command = bin_dir / name
+                command.write_text(f'#!/usr/bin/env bash\nprintf "{name} %s\\n" "$*" >> "$TEST_LOG"\n{body}\n')
+                command.chmod(0o755)
+            env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
+                                'TEST_LOG': str(commands),
+                                'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
+            installer = ROOT / 'installer/tmux_agent_sidebar.sh'
+            result = subprocess.run(['bash', str(installer)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = home / '.byobu/.tmux.conf'
+            self.assertIn('# >>> dev_setup tmux-agent-sidebar >>>', config.read_text())
+            self.assertIn(str(data / 'tmux-agent-sidebar/tmux-agent-sidebar.tmux'), config.read_text())
+            self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
+            result = subprocess.run(['bash', str(installer)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
+
+    def test_hook_script_reports_supported_agents(self):
+        result = subprocess.run(
+            ['bash', str(ROOT / 'installer/tmux_agent_sidebar_hooks.sh'), '--help'],
+            capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('codex', result.stdout)
+        self.assertIn('claude', result.stdout)
+        self.assertIn('opencode', result.stdout)
+
+    def test_byobu_script_uses_ubuntu_packages_without_creating_user_configuration(self):
+        script = ROOT / 'installer/byobu.sh'
+        result = subprocess.run(['bash', '-n', str(script)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = script.read_text()
+        self.assertIn('apt=(sudo apt-get)', text)
+        self.assertIn('"${apt[@]}" install -y tmux byobu', text)
+        self.assertNotIn('mkdir ', text)
+
+    def test_hook_script_merges_codex_and_links_opencode_in_user_home(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / 'home'
+            data = root / 'data'
+            home.mkdir()
+            binary = data / 'tmux-agent-sidebar/bin/tmux-agent-sidebar'
+            bridge = data / 'tmux-agent-sidebar/.opencode/plugins/tmux-agent-sidebar.js'
+            binary.parent.mkdir(parents=True)
+            bridge.parent.mkdir(parents=True)
+            binary.write_text('''#!/usr/bin/env bash
+if [[ $1 == setup && $2 == codex ]]; then
+    printf '%s\\n' '{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"bash hook.sh codex session-start"}]}]}}'
+fi
+''')
+            binary.chmod(0o755)
+            bridge.touch()
+            env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
+                                'XDG_CONFIG_HOME': str(root / 'config')}
+            script = ROOT / 'installer/tmux_agent_sidebar_hooks.sh'
+            result = subprocess.run(['bash', str(script), '--agent', 'codex'],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('codex_hooks = true', (home / '.codex/config.toml').read_text())
+            hooks = (home / '.codex/hooks.json').read_text()
+            self.assertEqual(hooks.count('bash hook.sh codex session-start'), 1)
+            result = subprocess.run(['bash', str(script), '--agent', 'codex'],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((home / '.codex/hooks.json').read_text().count('bash hook.sh codex session-start'), 1)
+            result = subprocess.run(['bash', str(script), '--agent', 'opencode'],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((root / 'config/opencode/plugins/tmux-agent-sidebar.js').resolve(), bridge)
 
 
 if __name__ == '__main__':

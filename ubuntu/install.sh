@@ -3,19 +3,21 @@ set -euo pipefail
 
 # Keep a deterministic execution order and one registry for all modes.
 readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly -a PACKAGES=(general_apps ubuntu_setting mozc hazkey github_ssh python docker nvidia_container_toolkit nodejs ghostty astronvim)
+readonly -a PACKAGES=(general_apps ubuntu_setting mozc hazkey github_ssh python docker nvidia_container_toolkit nodejs ghostty byobu tmux_agent_sidebar astronvim)
 declare -Ar PACKAGE_PATHS=(
     [general_apps]=general_apps [ubuntu_setting]=ubuntu_setting
     [mozc]=mozc [hazkey]=hazkey [github_ssh]=github_ssh [python]=python
     [docker]=docker [nvidia_container_toolkit]=nvidia_container_toolkit
-    [nodejs]=nodejs [ghostty]=ghostty [astronvim]=astronvim
+    [nodejs]=nodejs [ghostty]=ghostty [byobu]=byobu
+    [tmux_agent_sidebar]=tmux_agent_sidebar
+    [astronvim]=astronvim
 )
 
 usage() {
     cat <<'HELP'
 Usage: bash install.sh [OPTIONS]
   -i, --install NAME ...  Install selected packages
-      --all              Install defaults (excludes hazkey and nvidia_container_toolkit)
+      --all              Install defaults (excludes hazkey, nvidia_container_toolkit, byobu, and tmux_agent_sidebar)
       --dry              Print selected scripts without running them
   -l, --list             List available packages
   -q, --quiet            Hide installer stdout (stderr remains visible)
@@ -55,7 +57,8 @@ main() {
 
     for name in "${PACKAGES[@]}"; do
         if [[ -n ${requested[$name]:-} ]] ||
-            { [[ $all == true ]] && [[ $name != hazkey ]] && [[ $name != nvidia_container_toolkit ]]; }; then
+            { [[ $all == true ]] && [[ $name != hazkey ]] && [[ $name != nvidia_container_toolkit ]] &&
+              [[ $name != byobu ]] && [[ $name != tmux_agent_sidebar ]]; }; then
             selected+=("$name")
         fi
     done

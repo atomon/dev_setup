@@ -133,6 +133,50 @@ Ubuntu 24.04では、[Ghostty公式ドキュメント](https://ghostty.org/docs/
 `x-terminal-emulator` alternatives、26.04以降ではユーザーの
 `${XDG_CONFIG_HOME:-~/.config}/ubuntu-xdg-terminals.list` を設定します。
 
+## Byobu + tmux-agent-sidebar
+
+```bash
+# 管理者が一度だけ実行（sudo により Ubuntu の tmux / Byobu パッケージを導入）
+bash install.sh -i byobu
+
+# 各利用者が実行（ホームディレクトリ内だけを変更）
+bash install.sh -i tmux_agent_sidebar
+```
+
+Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ導入します。管理者が
+`sudo apt update && sudo apt install -y tmux byobu` を実行済みなら、`byobu` installerは不要です。
+Byobu の表示・キーバインド・tmux設定は利用者ごとの `~/.byobu/`（tmux backendでは
+`~/.byobu/.tmux.conf`）に保存されるため、共有リモートでも各自で独立して調整できます。
+
+tmux-agent-sidebar v0.13.0 は
+`${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの
+SHA-256とソースの固定commitを検証します。Byobu設定は `~/.byobu/.tmux.conf` の
+`dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し、変更前の設定は
+タイムスタンプ付きでバックアップします。共有リモートホストでも、他ユーザーの
+設定やシステムパッケージには触れません。
+
+ByobuのScreen backendは対象外です。既存layoutへの影響を避けるため、sidebarの自動作成、通知、
+下部Activity/Gitパネルは初期状態で無効です。
+`byobu-tmux` を起動して `Ctrl-a e` でsidebarを表示してください。
+
+agent連携は別スクリプトで、必要なものだけ有効にします。
+
+```bash
+# Codex: ~/.codex/hooks.json をバックアップしてマージし、config.toml の feature を有効化
+bash installer/tmux_agent_sidebar_hooks.sh --agent codex
+
+# OpenCode: ~/.config/opencode/plugins/ にユーザー単位の symlink を作成
+bash installer/tmux_agent_sidebar_hooks.sh --agent opencode
+
+# Claude Code: 上流推奨の plugin 導入コマンドを表示
+bash installer/tmux_agent_sidebar_hooks.sh --agent claude
+```
+
+Codex連携には安全なJSONマージのため `python3` が必要です。Claude Codeは、現在の上流推奨に
+従い `~/.claude/settings.json` へlegacy hookを書き込まず、Claude Code内でpluginを導入します。
+各agentを再起動してから状態表示を確認してください。Activityログを有効にする場合は、agentの
+hook情報が `/tmp/tmux-agent-activity_<pane>.log` に保存されるため、共有ホストの`/tmp`運用も確認してください。
+
 ## NVIDIA GPU を Docker で使用する
 
 NVIDIA GPU と動作する NVIDIA ドライバ、および Docker を導入済みの場合は、次を
