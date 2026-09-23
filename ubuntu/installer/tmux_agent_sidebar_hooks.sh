@@ -85,19 +85,26 @@ PY
     fi
     rm -f -- "$setup_json"
 
-    if [[ ! -f $config_file ]] || ! grep -Eq '^[[:space:]]*codex_hooks[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)?$' "$config_file"; then
+    if [[ ! -f $config_file ]] || ! awk '
+        /^[[:space:]]*\[features\][[:space:]]*(#.*)?$/ { inside = 1; next }
+        /^[[:space:]]*\[/ { inside = 0 }
+        inside && /^[[:space:]]*hooks[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)?$/ { canonical = 1 }
+        inside && /^[[:space:]]*codex_hooks[[:space:]]*=/ { deprecated = 1 }
+        END { exit(canonical && !deprecated ? 0 : 1) }
+    ' "$config_file"; then
         config_input=/dev/null
         [[ ! -f $config_file ]] || config_input=$config_file
         temporary=$(mktemp "$config_dir/.config.toml.XXXXXX") || die 'Could not create a temporary Codex configuration.'
         awk '
-            function add_setting() { if (!setting) print "codex_hooks = true"; setting = 1 }
+            function add_setting() { if (!setting) print "hooks = true"; setting = 1 }
             /^[[:space:]]*\[features\][[:space:]]*(#.*)?$/ { seen = 1; inside = 1; print; next }
             inside && /^[[:space:]]*\[/ { add_setting(); inside = 0 }
-            inside && /^[[:space:]]*codex_hooks[[:space:]]*=/ { print "codex_hooks = true"; setting = 1; next }
+            inside && /^[[:space:]]*hooks[[:space:]]*=/ { add_setting(); next }
+            inside && /^[[:space:]]*codex_hooks[[:space:]]*=/ { add_setting(); next }
             { print }
             END {
                 if (inside) add_setting()
-                if (!seen) { print ""; print "[features]"; print "codex_hooks = true" }
+                if (!seen) { print ""; print "[features]"; print "hooks = true" }
             }
         ' "$config_input" > "$temporary"
         if [[ -f $config_file ]]; then

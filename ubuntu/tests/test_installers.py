@@ -823,13 +823,23 @@ fi
 ''')
             binary.chmod(0o755)
             bridge.touch()
+            codex_dir = home / '.codex'
+            codex_dir.mkdir()
+            (codex_dir / 'config.toml').write_text(
+                '[features]\n'
+                'codex_hooks = false\n'
+                'multi_agent = true\n'
+            )
             env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
                                 'XDG_CONFIG_HOME': str(root / 'config')}
             script = ROOT / 'installer/tmux_agent_sidebar_hooks.sh'
             result = subprocess.run(['bash', str(script), '--agent', 'codex'],
                                     env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('codex_hooks = true', (home / '.codex/config.toml').read_text())
+            config = (home / '.codex/config.toml').read_text()
+            self.assertIn('hooks = true', config)
+            self.assertNotIn('codex_hooks', config)
+            self.assertIn('multi_agent = true', config)
             hooks = (home / '.codex/hooks.json').read_text()
             self.assertEqual(hooks.count('bash hook.sh codex session-start'), 1)
             result = subprocess.run(['bash', str(script), '--agent', 'codex'],
