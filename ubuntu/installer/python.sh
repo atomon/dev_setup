@@ -48,13 +48,27 @@ install_uv() {
 configure_user_path() {
     ensure_bashrc_line 'export PATH="$HOME/.local/bin:$PATH"'
     export PATH="$LOCAL_BIN:$PATH"
+    hash -r
 }
 
 install_python() {
     local uv_bin=$1
-    "$uv_bin" python install "$PYTHON_VERSION"
+    # AstroNvim looks for python or python3, while uv normally creates only a
+    # versioned executable such as python3.13.
+    UV_PYTHON_BIN_DIR="$LOCAL_BIN" "$uv_bin" python install --default "$PYTHON_VERSION"
     "$uv_bin" --version
     "$uv_bin" python find "$PYTHON_VERSION"
+}
+
+verify_python_commands() {
+    local command_name version
+    for command_name in python python3; do
+        command -v "$command_name" >/dev/null 2>&1 || \
+            die "uv did not install the $command_name command."
+        version=$("$command_name" --version 2>&1)
+        [[ $version == "Python $PYTHON_VERSION"* ]] || \
+            die "Expected $command_name $PYTHON_VERSION, got: $version"
+    done
 }
 
 main() {
@@ -66,7 +80,10 @@ main() {
 
     configure_user_path
     install_python "$uv_bin"
+    verify_python_commands
     printf '✨ Python %s environment is ready.\n' "$PYTHON_VERSION"
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi

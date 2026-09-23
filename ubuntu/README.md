@@ -111,9 +111,18 @@ INSTALL_NERD_FONT=0 bash install.sh -i astronvim
 ```
 
 The installer uses `wl-clipboard` in Wayland sessions and `xsel` otherwise.
-`ripgrep` and Tree-sitter CLI are installed when available; Node, Python,
-lazygit, gdu, and bottom remain optional tools and are not pulled in solely by
-AstroNvim.
+It also installs the external tools used by AstroNvim's default features:
+Tree-sitter CLI, a C build toolchain, `ripgrep`, `lazygit`, `gdu`, and the
+`btm` package. `btm` provides AstroNvim's optional `bottom` process viewer,
+opened with `<leader>tt`. All of these tools are installed from Ubuntu's APT
+repositories. APT recommendations are disabled to prevent `tree-sitter-cli`
+from installing Ubuntu's Node.js in addition to the nvm-managed version.
+Requirements that would otherwise only be recommendations, such as
+`openssh-client`, `xdg-utils`, and the C toolchain, are installed explicitly.
+Selecting `astronvim` through `install.sh` also runs the separate `python` and
+`nodejs` installers first. Python is managed by uv, while Node.js and npm are
+managed by nvm; the AstroNvim installer loads both user-scoped environments
+before synchronizing plugins.
 
 ## Ghostty
 

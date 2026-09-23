@@ -285,6 +285,9 @@ hazkey_main
         self.assertIn('ghostty', result.stdout)
         self.assertIn('installer/python.sh', result.stdout)
         self.assertNotIn('utils/python/', result.stdout)
+        result = self.launcher('--dry', '-i', 'astronvim')
+        self.assertEqual([line.split()[0] for line in result.stdout.splitlines()],
+                         ['python', 'nodejs', 'astronvim'])
 
     def test_invalid_arguments_fail(self):
         for args in ((), ('-i',), ('-i', '--dry'), ('-i', 'unknown'), ('--unknown',)):
@@ -304,6 +307,103 @@ hazkey_main
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('child-output', result.stdout)
         self.assertIn('Installed: hazkey', result.stdout)
+
+    def test_astronvim_is_skipped_when_runtime_dependency_fails(self):
+        shutil.copyfile(ROOT / 'install.sh', self.work / 'install.sh')
+        installer_dir = self.work / 'installer'
+        installer_dir.mkdir()
+        (installer_dir / 'python.sh').write_text('exit 42\n')
+        (installer_dir / 'nodejs.sh').write_text('exit 0\n')
+        (installer_dir / 'astronvim.sh').write_text('echo invoked > "$TEST_MARKER"\n')
+        marker = self.work / 'astronvim-invoked'
+        result = subprocess.run(
+            ['bash', str(self.work / 'install.sh'), '-i', 'astronvim'],
+            cwd=self.work, env=os.environ | {'TEST_MARKER': str(marker)},
+            input='', capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(marker.exists())
+        self.assertIn('Skipping astronvim', result.stderr)
+
+
+class AstroNvimInstallerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.work = Path(self.temp.name)
+        self.log = self.work / 'commands.log'
+        self.log.touch()
+        self.installer = ROOT / 'installer/astronvim.sh'
+        self.env = os.environ | {
+            'HOME': str(self.work),
+            'TEST_LOG': str(self.log),
+            'XDG_SESSION_TYPE': 'wayland',
+        }
+
+    def run_function(self, body, **changes):
+        command = f'''source "$1"
+{body}
+'''
+        return subprocess.run(
+            ['bash', '-c', command, 'test', str(self.installer)],
+            env=self.env | changes, capture_output=True, text=True)
+
+    def test_apt_installs_all_astronvim_feature_dependencies(self):
+        result = self.run_function(r'''
+sudo() { printf '%s\n' "$*" >> "$TEST_LOG"; }
+install_apt_requirements
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        install = self.log.read_text().splitlines()[-1]
+        self.assertIn('--no-install-recommends', install)
+        for package in ('build-essential', 'ripgrep', 'tree-sitter-cli', 'gdu',
+                        'btm', 'wl-clipboard', 'lazygit', 'openssh-client',
+                        'xdg-utils'):
+            self.assertIn(package, install)
+        for package in ('python3', 'nodejs', 'node-gyp', 'npm'):
+            self.assertNotIn(package, install)
+
+    def test_requirement_verification_includes_default_feature_commands(self):
+        result = self.run_function(r'''
+command() {
+  if [[ $1 == -v ]]; then
+    printf '%s\n' "$2" >> "$TEST_LOG"
+    return 0
+  fi
+  builtin command "$@"
+}
+verify_requirements
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self.log.read_text().splitlines(),
+            ['git', 'ssh', 'xdg-open', 'rg', 'cc', 'make', 'tree-sitter',
+             'lazygit', 'gdu', 'btm', 'python', 'python3', 'node', 'npm',
+             'wl-copy'])
+
+
+class PythonInstallerTests(unittest.TestCase):
+    def test_uv_installs_default_python_commands_for_astronvim(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            uv = root / 'uv'
+            log = root / 'commands.log'
+            uv.write_text('''#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$TEST_LOG"
+if [[ $1 == python && $2 == find ]]; then printf '/managed/python\\n'; fi
+if [[ $1 == --version ]]; then printf 'uv 1.0\\n'; fi
+''')
+            uv.chmod(0o755)
+            command = '''source "$1"
+install_python "$2"
+'''
+            result = subprocess.run(
+                ['bash', '-c', command, 'test',
+                 str(ROOT / 'installer/python.sh'), str(uv)],
+                env=os.environ | {'HOME': str(root), 'TEST_LOG': str(log)},
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(log.read_text().splitlines()[0],
+                             'python install --default 3.13')
 
 
 class DockerInstallerTests(unittest.TestCase):

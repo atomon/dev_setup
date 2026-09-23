@@ -31,7 +31,7 @@ fail() {
 }
 
 main() {
-    local all=false dry=false quiet=false name flag
+    local all=false dry=false quiet=false dependency_failed=false name flag
     local -A requested=()
     local -a selected=() installed=() failed=()
     while (( $# )); do
@@ -55,6 +55,14 @@ main() {
         esac
     done
 
+    # AstroNvim uses Python and Node for its optional REPLs, and npm is needed
+    # by plugins such as markdown-preview.nvim. Reuse their dedicated
+    # installers instead of installing a second system-managed runtime.
+    if [[ -n ${requested[astronvim]:-} ]]; then
+        requested[python]=1
+        requested[nodejs]=1
+    fi
+
     for name in "${PACKAGES[@]}"; do
         if [[ -n ${requested[$name]:-} ]] ||
             { [[ $all == true ]] && [[ $name != hazkey ]] && [[ $name != nvidia_container_toolkit ]] &&
@@ -76,17 +84,28 @@ main() {
     fi
 
     for name in "${selected[@]}"; do
+        if [[ $name == astronvim && $dependency_failed == true ]]; then
+            printf 'Skipping astronvim because its Python or Node.js installer failed.\n' >&2
+            failed+=("$name")
+            continue
+        fi
         printf 'Installing %s\n' "$name"
         if [[ $quiet == true ]]; then
             if bash "installer/${PACKAGE_PATHS[$name]}.sh" > /dev/null; then
                 installed+=("$name")
             else
                 failed+=("$name")
+                if [[ $name == python || $name == nodejs ]]; then
+                    dependency_failed=true
+                fi
             fi
         elif bash "installer/${PACKAGE_PATHS[$name]}.sh"; then
             installed+=("$name")
         else
             failed+=("$name")
+            if [[ $name == python || $name == nodejs ]]; then
+                dependency_failed=true
+            fi
         fi
     done
     if (( ${#installed[@]} )); then

@@ -99,19 +99,62 @@ clipboard_package() {
   fi
 }
 
-install_requirements() {
-  local -a packages=(ca-certificates curl git unzip tar gzip build-essential ripgrep)
+clipboard_command() {
+  if [[ ${XDG_SESSION_TYPE:-} == wayland ]]; then
+    printf '%s\n' wl-copy
+  else
+    printf '%s\n' xsel
+  fi
+}
+
+install_apt_requirements() {
+  local -a packages=(
+    ca-certificates curl git unzip tar gzip build-essential ripgrep
+    tree-sitter-cli lazygit gdu btm openssh-client xdg-utils
+  )
   packages+=("$(clipboard_package)")
 
-  # Mason can install Tree-sitter itself when the package is unavailable.
-  if apt-cache show tree-sitter-cli >/dev/null 2>&1; then
-    packages+=(tree-sitter-cli)
+  sudo apt-get update
+  # tree-sitter-cli recommends Ubuntu's nodejs package. Node.js is provided by
+  # the dedicated nvm installer, so install only hard dependencies here.
+  sudo apt-get install --no-install-recommends -y "${packages[@]}"
+}
+
+activate_runtime_dependencies() {
+  local nvm_home
+  export PATH="$HOME/.local/bin:$PATH"
+
+  if [[ -n ${NVM_DIR:-} ]]; then
+    nvm_home=$NVM_DIR
+  elif [[ -n ${XDG_CONFIG_HOME:-} ]]; then
+    nvm_home="$XDG_CONFIG_HOME/nvm"
   else
-    printf 'tree-sitter-cli is unavailable from APT; Mason will install it when needed.\n' >&2
+    nvm_home="$HOME/.nvm"
   fi
 
-  sudo apt-get update
-  sudo apt-get install -y "${packages[@]}"
+  if [[ -s $nvm_home/nvm.sh ]]; then
+    export NVM_DIR=$nvm_home
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+    nvm use --silent default >/dev/null
+  fi
+  hash -r
+}
+
+verify_requirements() {
+  local command_name
+  local -a commands=(git ssh xdg-open rg cc make tree-sitter lazygit gdu btm python python3 node npm)
+  commands+=("$(clipboard_command)")
+
+  for command_name in "${commands[@]}"; do
+    command -v "$command_name" >/dev/null 2>&1 || \
+      die "Required AstroNvim command was not installed: $command_name"
+  done
+}
+
+install_requirements() {
+  install_apt_requirements
+  verify_requirements
 }
 
 install_neovim() {
@@ -249,6 +292,7 @@ bootstrap_astronvim() {
 
 main() {
   [[ $EUID -ne 0 ]] || die 'Run this script as the desktop user, not as root.'
+  activate_runtime_dependencies
   install_requirements
   ensure_neovim
   ensure_nvim_alias
@@ -260,4 +304,6 @@ main() {
   printf 'Open a new Bash terminal before using the v alias.\n'
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi
