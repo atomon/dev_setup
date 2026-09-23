@@ -164,6 +164,8 @@ paneの画面内容とshell historyも保存・復元します。ただし、こ
 AI agentのprocessや会話状態は保存・再実行しないため、Codex/Claude/OpenCodeが復元時に
 自動起動して外部サービスへ接続することはありません。初回導入時のみGitHubからpluginを取得します。
 tmuxのmouse modeも有効になるため、paneの選択・リサイズ・スクロールをマウスで操作できます。
+GhosttyからByobu/tmux内のCodexへShift+Enterを区別して渡せるように、Ghosttyのextended-key
+対応をtmuxへ宣言し、CSI u形式で動的に有効化します。Codex側ではShift+Enterを改行へ割り当てて使用できます。
 手動保存は `Ctrl-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
 `byobu-resume` を実行します。`Ctrl-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
 

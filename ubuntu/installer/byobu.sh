@@ -86,6 +86,9 @@ main() {
         END {
             print "# >>> dev_setup byobu-session-restore >>>"
             print "set -g mouse on"
+            print "set -s extended-keys on"
+            print "set -s extended-keys-format csi-u"
+            print "set -s terminal-features[100] \047xterm-ghostty:extkeys\047"
             print "set -g @resurrect-dir \047" resurrect_dir "\047"
             print "set -g @resurrect-processes false"
             print "set -g @resurrect-capture-pane-contents on"
