@@ -8,6 +8,7 @@ source "$HAZKEY_INSTALLER_DIR/utils/hazkey_files.sh"
 source "$HAZKEY_INSTALLER_DIR/utils/hazkey_toolchain.sh"
 source "$HAZKEY_INSTALLER_DIR/utils/hazkey_setup.sh"
 source "$HAZKEY_INSTALLER_DIR/utils/hazkey_install.sh"
+source "$HAZKEY_INSTALLER_DIR/utils/hazkey_kimpanel.sh"
 
 hazkey_print_next_steps() {
 cat <<'EOF'
@@ -33,10 +34,12 @@ hazkey_main() {
         hazkey_usage
         return
     fi
+    local kimpanel=false
     local -a configure_options=()
     while (( $# )); do
         case "$1" in
             --no-input-history) configure_options+=(--no-input-history) ;;
+            --kimpanel) hazkey_kimpanel_supported; kimpanel=true ;;
             --layout=*) set -- --layout "${1#--layout=}" "${@:2}"; continue ;;
             --layout)
                 (( $# >= 2 )) || ime_error '--layout にはキーボード配列を指定してください（例: us, jp）。'
@@ -63,6 +66,9 @@ hazkey_main() {
     hazkey_install "$architecture" "$backend"
     hazkey_configure_user "$backend" "${configure_options[@]}"
     hazkey_configure_input_method
+    if [[ $kimpanel == true ]]; then
+        hazkey_install_kimpanel
+    fi
     hazkey_print_next_steps
 }
 
