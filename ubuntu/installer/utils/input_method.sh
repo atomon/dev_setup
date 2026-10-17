@@ -42,9 +42,22 @@ ime_configure_environment() {
     hazkey_install_managed_file "$template" "$environment_file" '既存のFcitx5環境設定'
 }
 
-ime_configure_login_environment() {
-    local pam_environment_file template
+ime_configure_login_environment() (
+    set -euo pipefail
+    local pam_environment_file template merged
     pam_environment_file="$HOME/.pam_environment"
     template="$HAZKEY_INSTALLER_DIR/DB/fcitx5-pam_environment"
-    hazkey_install_managed_file "$template" "$pam_environment_file" '既存のログイン環境設定'
-}
+    [[ -f $template ]] || ime_error "設定テンプレートが見つかりません: $template"
+    merged=$(mktemp)
+    trap 'rm -f -- "$merged"' EXIT
+    if [[ -e $pam_environment_file || -L $pam_environment_file ]]; then
+        # Keep the user's entries (e.g. locale written by GNOME Settings); replace only
+        # the template's lines and variables. Accept both "KEY OVERRIDE=" and "KEY=".
+        awk -F '[ \t=]+' 'NR == FNR { line[$0]; if ($1 !~ /^#/ && NF) key[$1]; next }
+            !($0 in line) && !($1 in key)' "$template" "$pam_environment_file" > "$merged"
+    fi
+    cat -- "$template" >> "$merged"
+    # Leave an already merged file (or symlink) untouched.
+    cmp -s "$merged" "$pam_environment_file" && return
+    hazkey_install_managed_file "$merged" "$pam_environment_file" '既存のログイン環境設定'
+)

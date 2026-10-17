@@ -83,6 +83,13 @@ hazkey_main
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('autostart', self.log.read_text())
 
+    def run_function(self, name: str, **changes: str) -> subprocess.CompletedProcess[str]:
+        """hazkey.sh を読み込んだ上での単一関数の実行（ログは初期化）"""
+        self.log.write_text('')
+        return subprocess.run(['bash', '-c', f'source "$1"; {name}', 'test',
+                               str(ROOT / 'installer/hazkey.sh')],
+                              env=self.env | changes, capture_output=True, text=True, check=False)
+
     def test_backend_is_detected_once_and_shared_by_install_and_configuration(self):
         command = '''source "$1"
         ime_require_session() { :; }
@@ -170,6 +177,20 @@ hazkey_main
         backups = list(home.glob('.pam_environment.before-hazkey.*'))
         self.assertEqual(len(backups), 1)
         self.assertEqual(backups[0].read_text(), original)
+
+    def test_login_environment_keeps_existing_entries(self):
+        home = self.work / 'home'
+        home.mkdir()
+        pam_environment = home / '.pam_environment'
+        locale = 'LANG\tDEFAULT=en_US.UTF-8\nLC_TIME\tDEFAULT=en_GB.UTF-8\n'
+        pam_environment.write_text(locale + 'QT_IM_MODULE OVERRIDE=ibus\nGTK_IM_MODULE=ibus\n')
+        for _ in range(2):
+            result = self.run_function('ime_configure_login_environment', HOME=str(home))
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(pam_environment.read_text(),
+                         locale + (ROOT / 'installer/DB/fcitx5-pam_environment').read_text())
+        # 2 回目は変更なしのため、バックアップの増加なし
+        self.assertEqual(len(list(home.glob('.pam_environment.before-hazkey.*'))), 1)
 
     def test_arm_build_enables_vulkan_for_a_detected_gpu(self):
         result = self.hazkey(TEST_VULKAN_GPU='yes')

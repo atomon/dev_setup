@@ -247,7 +247,8 @@ arm64（aarch64）では0.2.1の固定コミットからソースビルドしま
 Fcitx 5と `fcitx5-mozc` も導入し、同じ入力基盤上でHazkeyとMozcを比較できます。
 既存のIBusパッケージ・Mozc辞書・GNOME入力ソースは削除しません。
 `im-config -n fcitx5`、`~/.config/environment.d/90-fcitx5.conf`、`~/.pam_environment` によるユーザー設定の変更は再ログイン後に反映されます。
-GNOMEのログインセッションにもFcitx 5の環境変数を渡すため、`~/.pam_environment` を作成します。
+GNOMEのログインセッションにもFcitx 5の環境変数を渡すため、`~/.pam_environment` を作成・更新します。
+既存のロケール設定などの行は保持し、入力関連の変数（`XMODIFIERS`・`GTK_IM_MODULE`・`QT_IM_MODULE`・`SDL_IM_MODULE`）だけを置き換えます。
 既存の `~/.xinputrc`、`~/.config/environment.d/90-fcitx5.conf`、`~/.pam_environment` があれば、変更前に `*.before-hazkey.*` へ保存します。
 `--all` ではHazkeyは導入しません。試す場合は明示的に指定してください。
 
@@ -257,7 +258,7 @@ GNOMEのログインセッションにもFcitx 5の環境変数を渡すため�
 2. Hazkey・Fcitx 5・Mozcを導入します。
 3. 公式GUIと同じZenzaiモデルをダウンロードし、SHA-256を検証します。
 4. 既存のキーボード配列と入力ソースを保持して、Fcitx 5の各グループにHazkey・Mozcを追加します。
-5. `~/.config/environment.d/90-fcitx5.conf` と `~/.pam_environment` を作成し、GTK・Qt・SDL・XIM互換アプリおよびGNOMEログインセッションの入力環境をFcitx 5へ統一します。
+5. `~/.config/environment.d/90-fcitx5.conf` を作成し、`~/.pam_environment` に入力関連の変数を設定して、GTK・Qt・SDL・XIM互換アプリおよびGNOMEログインセッションの入力環境をFcitx 5へ統一します。
 6. Hazkeyの各プロファイルでZenzaiを有効にし、Vulkan GPUが利用できればGPUを選択します。
 
 完了後は作業を保存してログアウト・再ログインしてください。
@@ -317,7 +318,8 @@ GNOME標準のIBus構成へ戻す場合は次を実行し、再ログインし�
 bash installer/mozc.sh
 im-config -n ibus
 rm -f ~/.config/environment.d/90-fcitx5.conf
-rm -f ~/.pam_environment
+# ロケール設定などは残し、Hazkeyスクリプトが追加した入力関連の行だけを削除
+sed -i -E '/^# Use Fcitx5 for GTK/d; /^(XMODIFIERS|GTK_IM_MODULE|QT_IM_MODULE|SDL_IM_MODULE)[[:space:]=]/d' ~/.pam_environment
 ```
 
 GNOMEの「設定 → キーボード → 入力ソース」でMozcを選択します。
