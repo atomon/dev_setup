@@ -18,7 +18,7 @@ hazkey_download_deb() {
 
     ime_install_packages curl ca-certificates
     hazkey_fetch "${HAZKEY_REPOSITORY}/releases/download/$HAZKEY_VERSION/$HAZKEY_DEB_ASSET" "$destination"
-    printf '%s  %s\n' "$HAZKEY_SHA256" "$destination" | sha256sum --check --status
+    hazkey_verify_sha256 "$HAZKEY_SHA256" "$destination"
 }
 
 hazkey_install_runtime() {

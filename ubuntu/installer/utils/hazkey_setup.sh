@@ -5,13 +5,13 @@ hazkey_install_model() (
     directory="${XDG_DATA_HOME:-$HOME/.local/share}/hazkey/zenzai"
     target="$directory/zenzai.gguf"
     mkdir -p -- "$directory"
-    if [[ -f $target ]] && printf '%s  %s\n' "$ZENZAI_MODEL_SHA256" "$target" | sha256sum --check --status; then
+    if [[ -f $target ]] && hazkey_verify_sha256 "$ZENZAI_MODEL_SHA256" "$target"; then
         return
     fi
     temporary=$(mktemp "$directory/.zenzai.XXXXXX")
     trap 'rm -f -- "$temporary"' EXIT
     hazkey_fetch "$ZENZAI_MODEL_URL" "$temporary"
-    printf '%s  %s\n' "$ZENZAI_MODEL_SHA256" "$temporary" | sha256sum --check --status
+    hazkey_verify_sha256 "$ZENZAI_MODEL_SHA256" "$temporary"
     if [[ -e $target ]]; then
         backup=$(mktemp "$directory/zenzai.gguf.before-hazkey.XXXXXX")
         cp -- "$target" "$backup"

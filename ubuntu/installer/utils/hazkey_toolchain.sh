@@ -5,6 +5,10 @@ hazkey_fetch() {
     curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 "$1" -o "$2"
 }
 
+hazkey_verify_sha256() {
+    printf '%s  %s\n' "$1" "$2" | sha256sum --check --status
+}
+
 hazkey_swift_ready() {
     local info version
     command -v swift >/dev/null || return 1
@@ -48,7 +52,7 @@ hazkey_install_cmake() (
     trap 'rm -rf -- "$stage"' EXIT
     local archive="cmake-${HAZKEY_CMAKE_VERSION}-linux-aarch64.tar.gz"
     hazkey_fetch "https://github.com/Kitware/CMake/releases/download/v${HAZKEY_CMAKE_VERSION}/${archive}" "$stage/cmake.tar.gz"
-    printf '%s  %s\n' "$HAZKEY_CMAKE_SHA256" "$stage/cmake.tar.gz" | sha256sum --check --status
+    hazkey_verify_sha256 "$HAZKEY_CMAKE_SHA256" "$stage/cmake.tar.gz"
     mkdir "$stage/unpacked"
     tar -xzf "$stage/cmake.tar.gz" --strip-components=1 -C "$stage/unpacked"
     "$stage/unpacked/bin/cmake" --version
