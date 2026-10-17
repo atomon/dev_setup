@@ -90,24 +90,55 @@ hazkey_main
                                str(ROOT / 'installer/hazkey.sh')],
                               env=self.env | changes, capture_output=True, text=True, check=False)
 
-    def test_backend_is_detected_once_and_shared_by_install_and_configuration(self):
-        command = '''source "$1"
+    def hazkey_main_steps(self, *args: str, **changes: str) -> subprocess.CompletedProcess[str]:
+        """hazkey_main の各段階をスタブ化し、引数解析・段階の順序・設定への引数を記録"""
+        command = '''source "$1"; shift
         ime_require_session() { :; }
         ime_update_packages() { :; }
         ime_install_packages() { :; }
         hazkey_select_zenzai_backend() { echo detect >> "$TEST_LOG"; printf '%s\\n' Vulkan0; }
         hazkey_install() { printf 'install %s %s\\n' "$@" >> "$TEST_LOG"; }
-        hazkey_configure_user() { printf 'configure %s\\n' "$1" >> "$TEST_LOG"; }
+        hazkey_configure_user() { printf 'configure %s\\n' "$*" >> "$TEST_LOG"; }
         hazkey_configure_input_method() { :; }
         hazkey_print_next_steps() { :; }
-        hazkey_main
+        hazkey_main "$@"
 '''
-        result = subprocess.run(['bash', '-c', command, 'test', str(ROOT / 'installer/hazkey.sh')],
-                                env=self.env, capture_output=True, text=True)
+        self.log.write_text('')
+        # --layout の configure_hazkey.py --check による実環境の ~/.config 参照の防止
+        env = self.env | {'XDG_CONFIG_HOME': str(self.work / 'config')} | changes
+        return subprocess.run(['bash', '-c', command, 'test', str(ROOT / 'installer/hazkey.sh'), *args],
+                              env=env, capture_output=True, text=True, check=False)
+
+    def test_backend_is_detected_once_and_shared_by_install_and_configuration(self):
+        result = self.hazkey_main_steps()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text().splitlines(),
                          ['dpkg --print-architecture', 'detect', 'install arm64 Vulkan0',
                           'configure Vulkan0'])
+
+    def test_options_reach_configuration(self):
+        for args, expected in ((('--no-input-history',), 'configure Vulkan0 --no-input-history'),
+                               (('--layout', 'us'), 'configure Vulkan0 --layout us'),
+                               (('--layout=us+dvorak', '--no-input-history'),
+                                'configure Vulkan0 --layout us+dvorak --no-input-history')):
+            with self.subTest(args=args):
+                result = self.hazkey_main_steps(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                log = self.log.read_text()
+                self.assertIn(expected, log.splitlines())
+
+    def test_invalid_options_stop_before_any_change(self):
+        # 'xx' は形式上正しいが XKB に存在しない配列
+        for args, changes in ((('--no-input-history', '--bogus'), {}), (('--layout',), {}),
+                              (('--layout=',), {}), (('--layout', 'US'), {}),
+                              (('--layout', 'us;rm'), {}), (('--layout', 'xx'), {})):
+            with self.subTest(args=args):
+                result = self.hazkey_main_steps(*args, **changes)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                log = self.log.read_text()
+                self.assertNotIn('dpkg', log)
+                self.assertNotIn('configure', log)
 
     def test_autostart_entry_is_installed_for_xdg_config_home(self):
         config_home = self.work / 'config'

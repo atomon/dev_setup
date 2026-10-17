@@ -272,6 +272,34 @@ Fcitx 5のメニューでHazkeyを選択してください。Mozcにも同じメ
 同じディレクトリの `*.before-hazkey.*` にバックアップします。
 Hazkeyのカスタムキー設定・辞書設定などは保持します。Fcitxの設定ファイルのコメント・整形は再生成されます。
 
+次のオプションは `bash installer/hazkey.sh` に直接指定します（`install.sh -i hazkey` からは指定できません）。
+
+#### キーボード配列を指定する
+
+```bash
+bash installer/hazkey.sh --layout us        # 例: jp、us+dvorak（GNOME表記）、us-dvorak（Fcitx表記）
+```
+
+省略時は、GNOMEの入力ソースにある配列（`xkb`）を引き継ぎます。入力ソースがIBusのエンジン（Mozcなど）だけの場合は
+システム既定の `/etc/default/keyboard` を使います。IBus構成ではGNOMEが `us` を使っていることがあり、
+実際の配列と異なる場合があるため、導入後に配列が変わったら `--layout` を指定して再実行してください。
+指定した配列は既存の全グループの既定配列になり、旧配列の `keyboard-*` 項目は新しい配列に置き換わります
+（その他の `keyboard-*` 項目は保持）。配列名はパッケージの導入前に `/usr/share/X11/xkb/rules/evdev.lst` で確認します。
+GNOME Waylandでは、ログイン時にFcitx 5が自身の配列をGNOMEの入力ソースへ反映します。
+
+#### 入力履歴の学習を無効にする
+
+```bash
+bash installer/hazkey.sh --no-input-history
+```
+
+既定では、確定した変換（読みと表記の組）を `$XDG_STATE_HOME/hazkey/memory/`
+（通常は `~/.local/state/hazkey/memory/`）に保存し、次回以降の候補順に反映します。
+このファイルは端末内だけで使われますが、確定した語句をほぼ平文で含みます。
+`--no-input-history` を付けると全プロファイルで `useInputHistory` を `false` にし、学習データの読み書きを止めます。
+付けずに再実行しても元に戻らず、既存の学習データも削除しません。再度有効にする場合や学習データを削除する場合は
+`hazkey-settings`（削除は「Clear all input history data」）を使ってください。
+
 設定ファイルの競合を防ぐため、実行中のFcitx 5とHazkeyサーバーをSIGTERMで終了します。
 実行前に編集中の入力を確定し、設定画面を閉じてください。スクリプトは強制ログアウトしません。
 モデル取得に失敗した場合は、既存モデル・入力方式設定を変更せず停止します。

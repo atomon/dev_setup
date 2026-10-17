@@ -56,14 +56,25 @@ hazkey_configure_autostart() {
     hazkey_install_managed_file "$template" "$autostart_file" '既存のFcitx 5自動起動設定'
 }
 
-hazkey_configure_user() {
-    local backend=$1
+hazkey_configure_py() {
+    /usr/bin/python3 "$HAZKEY_INSTALLER_DIR/utils/configure_hazkey.py" "$@"
+}
 
+# Validate a layout name against XKB before any package is installed.
+hazkey_check_layout() {
+    local message
+    if ! message=$(hazkey_configure_py --layout "$1" --check 2>&1); then
+        ime_error "${message##*configure_hazkey.py: error: }"
+    fi
+}
+
+# Arguments: Zenzai backend, then configure_hazkey.py options such as --layout.
+hazkey_configure_user() {
     # Validate all settings before downloading or replacing any user data.
-    /usr/bin/python3 "$HAZKEY_INSTALLER_DIR/utils/configure_hazkey.py" --zenzai-backend "$backend" --check
+    hazkey_configure_py --zenzai-backend "$@" --check
     hazkey_install_model
     # Do not edit a live daemon's files: its shutdown would overwrite our changes.
     hazkey_stop_process fcitx5
     hazkey_stop_process hazkey-server
-    /usr/bin/python3 "$HAZKEY_INSTALLER_DIR/utils/configure_hazkey.py" --zenzai-backend "$backend"
+    hazkey_configure_py --zenzai-backend "$@"
 }

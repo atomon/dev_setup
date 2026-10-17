@@ -2,9 +2,11 @@
 # Install Hazkey and its runtime. Configuration is handled by hazkey_setup.sh.
 
 hazkey_usage() {
-    echo 'Usage: bash installer/hazkey.sh'
+    echo 'Usage: bash installer/hazkey.sh [--no-input-history] [--layout 配列]'
     echo 'Hazkey + Fcitx 5 + Mozcを導入し、入力ソース登録とZenzaiの設定を自動で行います。'
     echo 'amd64: 公式deb / arm64: Swift・CMakeが不足していれば自動導入してビルド'
+    echo '  --no-input-history  全プロファイルで入力履歴の学習を無効化（既存の学習データは削除しません）'
+    echo '  --layout 配列       Fcitx 5のキーボード配列を指定（例: us, jp, us+dvorak）。省略時は自動判定'
 }
 
 hazkey_assert_source_install_is_safe() {
