@@ -20,8 +20,7 @@ detector_spec.loader.exec_module(detector)
 
 def parse(text: str) -> configparser.ConfigParser:
     """profile の解析結果"""
-    config = configparser.ConfigParser(interpolation=None)
-    config.optionxform = str  # type: ignore[assignment, method-assign]
+    config = setup._FcitxConfig()
     config.read_string(text)
     return config
 
