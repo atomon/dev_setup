@@ -20,14 +20,14 @@ die() {
 }
 
 # Only an untouched checkout of the same upstream is replaced: no local changes
-# and no commits (stashes included) that exist only locally. Anything else
-# stays for the user.
+# and no commits that exist only locally, including stashes and commits left
+# only in the reflog. Anything else stays for the user.
 is_pristine_checkout() {
     local directory=$1 repository=$2 changes local_commits
 
     [[ $(git -C "$directory" remote get-url origin 2>/dev/null || true) == "$repository" ]] || return 1
     changes=$(git -C "$directory" status --porcelain 2>/dev/null) || return 1
-    local_commits=$(git -C "$directory" rev-list --count --all --not --remotes --tags 2>/dev/null) || return 1
+    local_commits=$(git -C "$directory" rev-list --count --all --reflog --not --remotes --tags 2>/dev/null) || return 1
     [[ -z $changes && $local_commits == 0 ]]
 }
 
@@ -149,4 +149,6 @@ main() {
     printf '%s\n' 'Run byobu-resume to restore the latest saved session; normal byobu-tmux startup is fresh.'
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi

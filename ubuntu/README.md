@@ -159,7 +159,7 @@ installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するた
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
 `${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の
-再実行では、ローカル変更やローカルだけのcommit（stashを含む）がなく同じupstreamを指す既存checkoutだけを、検証済みの新しいcheckoutへ置き換えます。3分ごとに
+再実行では、ローカル変更やローカルだけのcommit（stashやreflogにだけ残るものを含む）がなく同じupstreamを指す既存checkoutだけを、検証済みの新しいcheckoutへ置き換えます。3分ごとに
 session/window/pane構成と作業ディレクトリを `${XDG_DATA_HOME:-~/.local/share}/tmux/resurrect/`
 へ保存します。通常の `byobu-tmux` は新規sessionを開始し、`byobu-resume` を実行した場合だけ
 最新の `last` を復元します。既存tmux serverに保存済みsessionがなければ、安全のため復元せず

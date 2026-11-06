@@ -632,6 +632,45 @@ fi''',
             self.assertFalse(list(plugins.glob('.*')))
             self.assertEqual(clone_count(), clones + 2)
 
+    def test_pristine_checkout_detects_local_only_history(self) -> None:
+        """実際の git での、ローカルだけの commit・stash・reflog だけの commit の検出"""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            env = os.environ | {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1',
+                                'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t',
+                                'GIT_COMMITTER_NAME': 't', 'GIT_COMMITTER_EMAIL': 't@t'}
+
+            def git(*args: str) -> None:
+                """作業ディレクトリでの git の実行"""
+                subprocess.run(['git', *args], cwd=root, env=env, check=True, capture_output=True)
+
+            git('init', '-q', 'upstream')
+            git('-C', 'upstream', 'commit', '-q', '--allow-empty', '-m', 'pinned')
+            git('-C', 'upstream', 'tag', 'v1')
+            repository = f'file://{root}/upstream'
+            local = ['commit', '-q', '--allow-empty', '-m', 'local']
+            back_to_tag = ['switch', '-q', '--detach', 'v1']
+            states = {
+                'pristine': [],
+                'detached-commit': [local],
+                'branch-commit': [['switch', '-q', '-c', 'mine'], local, back_to_tag],
+                'stash': [['stash', '-q']],
+                'reflog-only': [local, back_to_tag],
+            }
+            for name, steps in states.items():
+                with self.subTest(state=name):
+                    git('clone', '-q', '--depth', '1', '--branch', 'v1', repository, name)
+                    if name == 'stash':
+                        (root / name / 'local').write_text('change\n')
+                        git('-C', name, 'add', 'local')
+                    for step in steps:
+                        git('-C', name, *step)
+                    result = subprocess.run(
+                        ['bash', '-c', 'source "$1"; is_pristine_checkout "$2" "$3"', 'test',
+                         str(self.INSTALLER), str(root / name), repository],
+                        env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode == 0, name == 'pristine', result.stderr)
+
     def test_byobu_restore_waits_for_client_and_reuses_saved_session_name(self) -> None:
         """保存 session 名の引き継ぎ・保存間隔の再開・未完了時の通知"""
         result = subprocess.run(['bash', '-n', str(self.RESTORE_HELPER)], capture_output=True, text=True)
