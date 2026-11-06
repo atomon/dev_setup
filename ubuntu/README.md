@@ -204,9 +204,12 @@ prefixはshellの行頭移動（`Ctrl-a`）と衝突しない `Alt-a` に変更�
 
 tmux-agent-sidebar v0.13.0 は
 `${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの
-SHA-256とソースの固定commitを検証します。Byobu設定は `~/.byobu/.tmux.conf` の
-`dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し、変更前の設定は
-タイムスタンプ付きでバックアップします。共有リモートホストでも、他ユーザーの
+SHA-256とソースの固定commitを検証します。配置済みのバイナリが固定SHA-256と一致する場合は再ダウンロード
+しません。固定バージョンを更新した後の再実行では、Byobu installerと同じ条件で既存checkoutを置き換えます。
+Byobu設定は `~/.byobu/.tmux.conf` の `dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し
+（既存のブロックはその場で更新し、他の管理ブロックとの順序は変えません）、変更前の設定は
+タイムスタンプ付きでバックアップします。macOS（x86_64 / arm64）では `bash installer/tmux_agent_sidebar.sh`
+を直接実行します。共有リモートホストでも、他ユーザーの
 設定やシステムパッケージには触れません。
 
 ByobuのScreen backendは対象外です。sidebarは新規windowに自動作成されます。下部の

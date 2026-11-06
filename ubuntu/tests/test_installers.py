@@ -610,6 +610,13 @@ fi''',
             self.assertNotIn('macos-option-as-alt', result.stdout)
             self.assertNotIn('is not in PATH', result.stdout)
 
+            other_block = '# >>> dev_setup other >>>\nset -g @other on\n# <<< dev_setup other <<<\n'
+            config.write_text(config_text + other_block)
+            result = run_installer()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn('Backed up', result.stdout)
+            self.assertEqual(config.read_text(), config_text + other_block)
+
             calls = len(log.read_text().splitlines())
             result = run_installer(TEST_UNAME='Darwin')
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -816,6 +823,9 @@ printf 'tmux %s\\n' "$*" >> "$TEST_LOG"
 
 
 class TmuxAgentSidebarInstallerTests(unittest.TestCase):
+    LINUX_X86_64_SHA256 = 'e06495a327a074c6e38c3d7697f061bdb6d19f04b67d9fc30137d34d9318e344'
+    DARWIN_AARCH64_SHA256 = '61c7faf1b37ae72614889914ce016378b0e48461d74d6faf360193ed648c23a3'
+
     def test_scripts_are_syntax_valid_and_keep_changes_in_the_user_home(self):
         installer = ROOT / 'installer/tmux_agent_sidebar.sh'
         hooks = ROOT / 'installer/tmux_agent_sidebar_hooks.sh'
@@ -828,7 +838,8 @@ class TmuxAgentSidebarInstallerTests(unittest.TestCase):
         self.assertIn("SIDEBAR_COMMIT='d89fe2025cd3f7149b0c8af9d48f15eab5fc2a3a'", text)
         self.assertIn('XDG_DATA_HOME', text)
         self.assertIn('$HOME/.byobu', text)
-        self.assertIn('sha256sum --check --status', text)
+        self.assertIn(f"SIDEBAR_DARWIN_AARCH64_SHA256='{self.DARWIN_AARCH64_SHA256}'", text)
+        self.assertIn('shasum -a 256', text)
 
     def test_installer_writes_only_user_scoped_byobu_configuration(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -843,16 +854,27 @@ class TmuxAgentSidebarInstallerTests(unittest.TestCase):
             mocks = {
                 'byobu-tmux': ':',
                 'tmux': 'if [[ $1 == -V ]]; then echo "tmux 3.4"; fi',
+                'uname': '[[ $1 == -s ]] && echo "${TEST_UNAME:-Linux}"; [[ $1 == -m ]] && echo "${TEST_ARCH:-x86_64}"; true',
                 'git': '''if [[ $1 == clone ]]; then
     destination=${!#}
     mkdir -p "$destination/.git" "$destination/.opencode/plugins"
     touch "$destination/tmux-agent-sidebar.tmux" "$destination/hook.sh" \\
         "$destination/.opencode/plugins/tmux-agent-sidebar.js"
-elif [[ $1 == -C ]]; then
-    echo d89fe2025cd3f7149b0c8af9d48f15eab5fc2a3a
+elif [[ $1 == -C && $3 == rev-parse ]]; then
+    if [[ -n ${TEST_OLD_CHECKOUT:-} && ${2%/*} == "$XDG_DATA_HOME" ]]; then
+        echo old
+    else
+        echo d89fe2025cd3f7149b0c8af9d48f15eab5fc2a3a
+    fi
+elif [[ $1 == -C && $3 == remote ]]; then
+    echo https://github.com/hiroppy/tmux-agent-sidebar.git
+elif [[ $1 == -C && $3 == status ]]; then
+    printf '%s' "${TEST_PLUGIN_STATUS:-}"
+elif [[ $1 == -C && $3 == rev-list ]]; then
+    echo 0
 fi''',
                 'curl': 'while (( $# )); do [[ $1 == --output ]] && { touch "$2"; break; }; shift; done',
-                'sha256sum': '[[ $1 == --check ]] && { cat >/dev/null; exit 0; }',
+                'sha256sum': 'printf "%s  %s\\n" "${TEST_SHA256:-' + self.LINUX_X86_64_SHA256 + '}" "${!#}"',
             }
             for name, body in mocks.items():
                 command = bin_dir / name
@@ -862,7 +884,17 @@ fi''',
                                 'TEST_LOG': str(commands),
                                 'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
             installer = ROOT / 'installer/tmux_agent_sidebar.sh'
-            result = subprocess.run(['bash', str(installer)], env=env, capture_output=True, text=True)
+            binary = data / 'tmux-agent-sidebar/bin/tmux-agent-sidebar'
+
+            def run_installer(**changes: str) -> subprocess.CompletedProcess[str]:
+                """環境変数を追加した installer の実行"""
+                return subprocess.run(['bash', str(installer)], env=env | changes, capture_output=True, text=True)
+
+            def downloads() -> list[str]:
+                """これまでの curl の呼び出し"""
+                return [line for line in commands.read_text().splitlines() if line.startswith('curl ')]
+
+            result = run_installer()
             self.assertEqual(result.returncode, 0, result.stderr)
             config = home / '.byobu/.tmux.conf'
             self.assertIn('# >>> dev_setup tmux-agent-sidebar >>>', config.read_text())
@@ -870,11 +902,40 @@ fi''',
             self.assertIn('set -g @sidebar_bottom_height 20', config.read_text())
             self.assertIn(f"set -g @agent_sidebar_dir '{data}/tmux-agent-sidebar'", config.read_text())
             self.assertIn(str(data / 'tmux-agent-sidebar/tmux-agent-sidebar.tmux'), config.read_text())
-            self.assertRegex(commands.read_text(), r'curl .*--output .*/bin/\.tmux-agent-sidebar\.')
+            self.assertEqual(len(downloads()), 1)
+            self.assertRegex(downloads()[0], r'--output .*/bin/\.tmux-agent-sidebar\..* \S+/tmux-agent-sidebar-linux-x86_64$')
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
-            result = subprocess.run(['bash', str(installer)], env=env, capture_output=True, text=True)
+
+            # A verified binary is not downloaded again, and a block followed by
+            # another managed block stays where it is.
+            other_block = '# >>> dev_setup other >>>\nset -g @other on\n# <<< dev_setup other <<<\n'
+            config.write_text(config.read_text() + other_block)
+            config_text = config.read_text()
+            result = run_installer()
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
+            self.assertEqual(len(downloads()), 1)
+            self.assertNotIn('Backed up', result.stdout)
+            self.assertEqual(config.read_text(), config_text)
+
+            result = run_installer(TEST_OLD_CHECKOUT='1', TEST_PLUGIN_STATUS=' M hook.sh')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('has local changes, local-only commits, or another origin', result.stderr)
+            result = run_installer(TEST_OLD_CHECKOUT='1')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('Updated tmux-agent-sidebar to v0.13.0', result.stdout)
+            self.assertFalse(list(data.glob('.*')))
+            self.assertEqual(len(downloads()), 2)
+
+            binary.unlink()
+            result = run_installer(TEST_SHA256='bad')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('checksum verification failed', result.stderr)
+            result = run_installer(TEST_UNAME='Darwin', TEST_ARCH='arm64', TEST_SHA256=self.DARWIN_AARCH64_SHA256)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertRegex(downloads()[-1], r'/tmux-agent-sidebar-darwin-aarch64$')
+            result = run_installer(TEST_UNAME='FreeBSD')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Unsupported platform: FreeBSD', result.stderr)
 
     def test_hook_script_reports_supported_agents(self):
         result = subprocess.run(
