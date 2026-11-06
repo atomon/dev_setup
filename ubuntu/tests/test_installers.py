@@ -1,6 +1,7 @@
 """No network, package installation, or desktop setting changes."""
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -517,6 +518,14 @@ case "$*" in
         return subprocess.run(['bash', str(self.RESTORE_HELPER), *args], env=env,
                               capture_output=True, text=True)
 
+    def test_macos_installers_avoid_double_dash_after_chmod_mode(self) -> None:
+        """macOS の chmod がファイル名として扱う、モードの後ろの -- を使っていないこと"""
+        for script in ('installer/byobu.sh', 'installer/tmux_agent_sidebar.sh', 'installer/utils/byobu_common.sh',
+                       'installer/utils/byobu_restore_after_attach.sh', 'installer/utils/byobu_resume.sh'):
+            with self.subTest(script=script):
+                text = (ROOT / script).read_text()
+                self.assertEqual(re.findall(r'(?m)^[^#\n]*\bchmod\s+[0-7]{3,4}\s+--\s.*$', text), [])
+
     def test_byobu_script_configures_private_user_scoped_session_restore(self) -> None:
         """利用者専用の復元設定・plugin の固定版検証・未変更 checkout に限った置き換え・macOS の Homebrew 経路"""
         result = subprocess.run(['bash', '-n', str(self.INSTALLER)], capture_output=True, text=True)
@@ -740,7 +749,7 @@ fi''',
             sidebar_log = root / 'sidebar.log'
             last = ('pane\t1\t0\t1\t:*\t0\ttitle\t:/tmp\t0\ttmux-agent-sidebar\t:\n'
                     'pane\t1\t0\t1\t:*\t1\ttitle\t:/tmp\t1\tbash\t:\n'
-                    'pane\t1\t1\t0\t:-\t0\ttitle\t:/work\t0\ttmux-agent-sidebar\t:\n'
+                    'pane\t1\t1\t0\t:-\t0\ttitle\t:/work\t0\ttmux-agent-sidebar.real\t:\n'
                     'pane\t1\t1\t0\t:-\t1\ttitle\t:/work\t1\tbash\t:\n'
                     'state\t1\t\n')
             tmux_cases = '''  'show-option -gqv @agent_sidebar_dir') printf '%s\\n' "$TEST_SIDEBAR_DIR" ;;
@@ -881,11 +890,15 @@ fi''',
                 command.write_text(f'#!/usr/bin/env bash\nprintf "{name} %s\\n" "$*" >> "$TEST_LOG"\n{body}\n')
                 command.chmod(0o755)
             env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
+                                'CLAUDE_CONFIG_DIR': str(home / '.claude'),
                                 'TEST_LOG': str(commands),
                                 'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
             installer = ROOT / 'installer/tmux_agent_sidebar.sh'
             binary = data / 'tmux-agent-sidebar/bin/tmux-agent-sidebar'
             real_binary = binary.with_name('tmux-agent-sidebar.real')
+            cached = home / '.claude/plugins/cache/hiroppy/tmux-agent-sidebar/0.13.0/bin/tmux-agent-sidebar'
+            cached.parent.mkdir(parents=True)
+            cached.write_text('unwrapped binary from an older install\n')
             old_log = Path(f'/tmp/tmux-agent-activity_dev_setup_test_{os.getpid()}.log')
             old_log.write_text('')
             old_log.chmod(0o664)
@@ -913,6 +926,8 @@ fi''',
             self.assertEqual(stat.S_IMODE(binary.stat().st_mode), 0o755)
             self.assertIn(f"exec '{real_binary}'", binary.read_text())
             self.assertEqual(stat.S_IMODE(old_log.stat().st_mode), 0o600)
+            self.assertEqual(cached.read_text(), binary.read_text())
+            self.assertIn(f'Updated the Claude Code plugin cache: {cached}', result.stdout)
 
             # A verified binary is not downloaded again, and a block followed by
             # another managed block stays where it is.
@@ -923,6 +938,7 @@ fi''',
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(len(downloads()), 1)
             self.assertNotIn('Backed up', result.stdout)
+            self.assertNotIn('plugin cache', result.stdout)
             self.assertEqual(config.read_text(), config_text)
 
             result = run_installer(TEST_OLD_CHECKOUT='1', TEST_PLUGIN_STATUS=' M hook.sh')

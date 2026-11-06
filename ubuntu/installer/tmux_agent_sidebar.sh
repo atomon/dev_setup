@@ -26,7 +26,7 @@ sha256_of() {
 }
 
 main() {
-    local data_home install_dir config_file binary real_binary binary_temp binary_name binary_sha256
+    local data_home install_dir config_file binary real_binary binary_temp binary_name binary_sha256 cached
     local tmux_version tmux_major tmux_minor
 
     (( EUID != 0 )) || die 'Run this installer as the target user, without sudo.'
@@ -99,6 +99,13 @@ EOF
     chmod 0755 "$binary_temp"
     mv -- "$binary_temp" "$binary"
     binary_temp=''
+    # Claude Code runs plugin hooks from its cache, which keeps its own copy of
+    # bin/. Replace copies that predate the wrapper.
+    for cached in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/tmux-agent-sidebar/*/bin/tmux-agent-sidebar; do
+        [[ -f $cached ]] && ! cmp -s "$binary" "$cached" || continue
+        install -m 0755 -- "$binary" "$cached"
+        printf 'Updated the Claude Code plugin cache: %s\n' "$cached"
+    done
     # The trailing slash makes find descend into macOS's /tmp -> /private/tmp symlink.
     find /tmp/ -maxdepth 1 -type f -name 'tmux-agent-activity_*.log' -user "$(id -u)" -exec chmod 0600 {} +
 

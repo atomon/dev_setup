@@ -263,6 +263,8 @@ Codex連携には安全なJSONマージのため `python3` が必要です。Cla
 コマンドやファイルパスが `/tmp/tmux-agent-activity_<pane>.log` に保存されます。installerは
 `bin/tmux-agent-sidebar` を、hook処理のときだけ `umask 077` で検証済みバイナリ（`.real`）を実行する
 ラッパーにするため、ログは本人だけが読める権限（0600）で作られます（その他の処理の権限は変えません）。
+Claude Codeはpluginキャッシュに `bin/` をコピーして使うため、ラッパー導入前のバイナリがキャッシュに
+残っている場合は、installerがラッパーに置き換えます。
 ファイル名はpane番号で決まるため、共有ホストでは他ユーザーとの名前の衝突にも注意してください。
 
 ## NVIDIA GPU を Docker で使用する
