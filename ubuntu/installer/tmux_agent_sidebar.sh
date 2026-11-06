@@ -112,7 +112,7 @@ main() {
         tmux source-file "$config_file"
     fi
     printf '%s\n' "tmux-agent-sidebar ${SIDEBAR_VERSION} is installed at ${install_dir}."
-    printf '%s\n' 'Start Byobu with byobu-tmux, then use Ctrl-a e to toggle the sidebar.'
+    printf '%s\n' 'Start Byobu with byobu-tmux, then use Alt-a e (or F12 e) to toggle the sidebar.'
     printf '%s\n' 'Configure agent integrations separately with installer/tmux_agent_sidebar_hooks.sh.'
 }
 

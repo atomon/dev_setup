@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
 # Install Byobu system-wide, then configure tmux session persistence for the
-# invoking user. Pane contents and shell history are restored, but AI agent
-# processes are deliberately not restarted.
+# invoking user. Pane contents are restored, but AI agent processes are
+# deliberately not restarted.
 set -Eeuo pipefail
 
 readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly SAVE_INTERVAL_MINUTES=3
 readonly RESURRECT_VERSION='v4.0.0'
 readonly RESURRECT_COMMIT='e87d7d592cac97fa38c12395ebec042c154a1844'
 readonly RESURRECT_REPOSITORY='https://github.com/tmux-plugins/tmux-resurrect.git'
@@ -18,27 +19,42 @@ die() {
     exit 1
 }
 
+# Only an untouched checkout of the same upstream is replaced: no local changes
+# and no commits that exist only locally, including stashes and commits left
+# only in the reflog. Anything else stays for the user.
+is_pristine_checkout() {
+    local directory=$1 repository=$2 changes local_commits
+
+    [[ $(git -C "$directory" remote get-url origin 2>/dev/null || true) == "$repository" ]] || return 1
+    changes=$(git -C "$directory" status --porcelain 2>/dev/null) || return 1
+    local_commits=$(git -C "$directory" rev-list --count --all --reflog --not --remotes --tags 2>/dev/null) || return 1
+    [[ -z $changes && $local_commits == 0 ]]
+}
+
 install_plugin() {
-    local name=$1 version=$2 commit=$3 repository=$4 plugin_root=$5 destination stage
+    local name=$1 version=$2 commit=$3 repository=$4 plugin_root=$5 destination work
 
     destination="$plugin_root/$name"
     if [[ -e $destination ]]; then
         [[ -d $destination/.git ]] || die "$destination exists but is not a Git checkout."
-        [[ $(git -C "$destination" rev-parse HEAD 2>/dev/null || true) == "$commit" ]] || \
-            die "$destination is not the expected $version; preserve it or move it before installing."
-        return
+        [[ $(git -C "$destination" rev-parse HEAD 2>/dev/null || true) != "$commit" ]] || return 0
+        is_pristine_checkout "$destination" "$repository" || \
+            die "$destination is not the expected $version and has local changes, local-only commits, or another origin; preserve it or move it before installing."
     fi
 
-    stage=$(mktemp -d "$plugin_root/.${name}.XXXXXX") || die "Could not create a temporary $name directory."
-    if ! git clone --depth 1 --branch "$version" "$repository" "$stage"; then
-        rm -rf -- "$stage"
+    work=$(mktemp -d "$plugin_root/.${name}.XXXXXX") || die "Could not create a temporary $name directory."
+    if ! git clone --depth 1 --branch "$version" "$repository" "$work/new"; then
+        rm -rf -- "$work"
         die "Could not clone $name."
     fi
-    if [[ $(git -C "$stage" rev-parse HEAD) != "$commit" ]]; then
-        rm -rf -- "$stage"
+    if [[ $(git -C "$work/new" rev-parse HEAD) != "$commit" ]]; then
+        rm -rf -- "$work"
         die "$name source does not match the expected $version commit."
     fi
-    mv -- "$stage" "$destination"
+    [[ ! -e $destination ]] || mv -- "$destination" "$work/previous"
+    mv -- "$work/new" "$destination"
+    [[ ! -e $work/previous ]] || printf 'Updated %s to %s\n' "$name" "$version"
+    rm -rf -- "$work"
 }
 
 main() {
@@ -53,7 +69,8 @@ main() {
 
     sudo -v
     sudo apt-get update
-    sudo apt-get install -y tmux byobu
+    # tmux comes in as byobu's dependency, so apt can autoremove it with byobu.
+    sudo apt-get install -y byobu
     command -v tmux >/dev/null 2>&1 || die 'tmux was not installed.'
     command -v byobu-tmux >/dev/null 2>&1 || die 'byobu-tmux was not installed.'
 
@@ -76,7 +93,8 @@ main() {
     config_input=/dev/null
     [[ ! -f $config_file ]] || config_input=$config_file
     config_temp=$(mktemp "$config_dir/.byobu-session-restore.XXXXXX") || die 'Could not create a temporary Byobu configuration.'
-    if ! awk -v resurrect_dir="$resurrect_dir" \
+    if ! awk -v save_interval="$SAVE_INTERVAL_MINUTES" \
+        -v resurrect_dir="$resurrect_dir" \
         -v resurrect="$plugin_root/tmux-resurrect/resurrect.tmux" \
         -v continuum="$plugin_root/tmux-continuum/continuum.tmux" \
         -v restore_helper="$restore_helper" '
@@ -86,18 +104,20 @@ main() {
         END {
             print "# >>> dev_setup byobu-session-restore >>>"
             print "set -g mouse on"
+            print "set -g prefix M-a"
+            print "unbind-key -n C-a"
+            print "bind-key M-a send-prefix"
             print "set -s extended-keys on"
-            print "set -s extended-keys-format csi-u"
+            print "set -sq extended-keys-format csi-u"
             print "set -s terminal-features[100] \047xterm-ghostty:extkeys\047"
             print "set -g @resurrect-dir \047" resurrect_dir "\047"
             print "set -g @resurrect-processes false"
             print "set -g @resurrect-capture-pane-contents on"
-            print "set -g @resurrect-save-shell-history on"
-            print "set -g @continuum-save-interval 3"
+            print "set -g @continuum-save-interval " save_interval
             print "set -g @continuum-restore off"
             print "set -g @continuum-boot off"
             print "if-shell -F \047#{!=:#{DEV_SETUP_BYOBU_RESUME_SESSION},}\047 \047set -g @continuum-save-interval 0\047"
-            print "set-hook -g after-new-session[900] \047run-shell -b \042" restore_helper "\042\047"
+            print "set-hook -g after-new-session[900] \047run-shell -b \042" restore_helper " " save_interval "\042\047"
             print "run-shell \047" resurrect "\047"
             print "run-shell \047" continuum "\047"
             print "# <<< dev_setup byobu-session-restore <<<"
@@ -123,10 +143,12 @@ main() {
     tmux -V
     printf '%s\n' 'Byobu and tmux are installed system-wide.'
     printf '%s\n' 'Session layout and working directories can be restored with byobu-resume.'
-    printf 'Pane contents and shell history are saved under %s.\n' "$resurrect_dir"
-    printf '%s\n' 'WARNING: Saved pane contents and shell history are unencrypted and can contain credentials or other sensitive data.'
+    printf 'Pane contents are saved under %s.\n' "$resurrect_dir"
+    printf '%s\n' 'WARNING: Saved pane contents are unencrypted and can contain credentials or other sensitive data.'
     printf '%s\n' 'AI agent processes are not restarted.'
     printf '%s\n' 'Run byobu-resume to restore the latest saved session; normal byobu-tmux startup is fresh.'
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi
