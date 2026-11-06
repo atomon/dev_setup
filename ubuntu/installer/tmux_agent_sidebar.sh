@@ -98,7 +98,8 @@ EOF
     chmod 0755 -- "$binary_temp"
     mv -- "$binary_temp" "$binary"
     binary_temp=''
-    find /tmp -maxdepth 1 -type f -name 'tmux-agent-activity_*.log' -user "$(id -u)" -exec chmod 0600 {} +
+    # The trailing slash makes find descend into macOS's /tmp -> /private/tmp symlink.
+    find /tmp/ -maxdepth 1 -type f -name 'tmux-agent-activity_*.log' -user "$(id -u)" -exec chmod 0600 {} +
 
     write_managed_block "$config_file" tmux-agent-sidebar <<EOF
 set -g @sidebar_auto_create on
