@@ -232,8 +232,11 @@ bash installer/tmux_agent_sidebar_hooks.sh --agent claude
 
 Codex連携には安全なJSONマージのため `python3` が必要です。Claude Codeは、現在の上流推奨に
 従い `~/.claude/settings.json` へlegacy hookを書き込まず、Claude Code内でpluginを導入します。
-各agentを再起動してから状態表示を確認してください。Activityログを有効にする場合は、agentの
-hook情報が `/tmp/tmux-agent-activity_<pane>.log` に保存されるため、共有ホストの`/tmp`運用も確認してください。
+各agentを再起動してから状態表示を確認してください。Activityログを有効にする場合は、agentが実行した
+コマンドやファイルパスが `/tmp/tmux-agent-activity_<pane>.log` に保存されます。installerは
+`bin/tmux-agent-sidebar` を、hook処理のときだけ `umask 077` で検証済みバイナリ（`.real`）を実行する
+ラッパーにするため、ログは本人だけが読める権限（0600）で作られます（その他の処理の権限は変えません）。
+ファイル名はpane番号で決まるため、共有ホストでは他ユーザーとの名前の衝突にも注意してください。
 
 ## NVIDIA GPU を Docker で使用する
 

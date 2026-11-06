@@ -885,6 +885,11 @@ fi''',
                                 'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
             installer = ROOT / 'installer/tmux_agent_sidebar.sh'
             binary = data / 'tmux-agent-sidebar/bin/tmux-agent-sidebar'
+            real_binary = binary.with_name('tmux-agent-sidebar.real')
+            old_log = Path(f'/tmp/tmux-agent-activity_dev_setup_test_{os.getpid()}.log')
+            old_log.write_text('')
+            old_log.chmod(0o664)
+            self.addCleanup(old_log.unlink, missing_ok=True)
 
             def run_installer(**changes: str) -> subprocess.CompletedProcess[str]:
                 """環境変数を追加した installer の実行"""
@@ -905,6 +910,9 @@ fi''',
             self.assertEqual(len(downloads()), 1)
             self.assertRegex(downloads()[0], r'--output .*/bin/\.tmux-agent-sidebar\..* \S+/tmux-agent-sidebar-linux-x86_64$')
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-tmux-agent-sidebar.*')))
+            self.assertEqual(stat.S_IMODE(binary.stat().st_mode), 0o755)
+            self.assertIn(f"exec '{real_binary}'", binary.read_text())
+            self.assertEqual(stat.S_IMODE(old_log.stat().st_mode), 0o600)
 
             # A verified binary is not downloaded again, and a block followed by
             # another managed block stays where it is.
@@ -926,7 +934,7 @@ fi''',
             self.assertFalse(list(data.glob('.*')))
             self.assertEqual(len(downloads()), 2)
 
-            binary.unlink()
+            real_binary.unlink()
             result = run_installer(TEST_SHA256='bad')
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('checksum verification failed', result.stderr)
@@ -936,6 +944,15 @@ fi''',
             result = run_installer(TEST_UNAME='FreeBSD')
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Unsupported platform: FreeBSD', result.stderr)
+
+            # Only the hook subcommand, which writes the activity log, runs owner-only.
+            real_binary.write_text('#!/bin/sh\n: > "$TEST_OUT/$1"\n')
+            for subcommand, mode in (('hook', 0o600), ('toggle', 0o664)):
+                with self.subTest(subcommand=subcommand):
+                    result = subprocess.run(['bash', '-c', 'umask 002; exec "$0" "$@"', str(binary), subcommand],
+                                            env=env | {'TEST_OUT': str(root)}, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(stat.S_IMODE((root / subcommand).stat().st_mode), mode)
 
     def test_hook_script_reports_supported_agents(self):
         result = subprocess.run(

@@ -26,7 +26,7 @@ sha256_of() {
 }
 
 main() {
-    local data_home install_dir config_file binary binary_temp binary_name binary_sha256
+    local data_home install_dir config_file binary real_binary binary_temp binary_name binary_sha256
     local tmux_version tmux_major tmux_minor
 
     (( EUID != 0 )) || die 'Run this installer as the target user, without sudo.'
@@ -65,6 +65,7 @@ main() {
     install_dir="$data_home/tmux-agent-sidebar"
     config_file="$HOME/.byobu/.tmux.conf"
     binary="$install_dir/bin/tmux-agent-sidebar"
+    real_binary="$binary.real"
     binary_temp=''
     trap '[[ -z ${binary_temp:-} ]] || rm -f -- "$binary_temp"' EXIT
     mkdir -p -- "$data_home"
@@ -72,17 +73,32 @@ main() {
     install_plugin tmux-agent-sidebar "$SIDEBAR_VERSION" "$SIDEBAR_COMMIT" "$SIDEBAR_REPOSITORY" "$data_home"
 
     # A binary that already matches the pinned checksum is not downloaded again.
-    if [[ ! -x $binary || $(sha256_of "$binary") != "$binary_sha256" ]]; then
-        mkdir -p -- "${binary%/*}"
+    mkdir -p -- "${binary%/*}"
+    if [[ ! -x $real_binary || $(sha256_of "$real_binary") != "$binary_sha256" ]]; then
         binary_temp=$(mktemp "${binary%/*}/.tmux-agent-sidebar.XXXXXX") || die 'Could not create a temporary sidebar binary.'
         curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 \
             --output "$binary_temp" "$SIDEBAR_RELEASE_BASE/$binary_name"
         [[ $(sha256_of "$binary_temp") == "$binary_sha256" ]] || \
             die 'tmux-agent-sidebar binary checksum verification failed.'
         chmod 0755 -- "$binary_temp"
-        mv -- "$binary_temp" "$binary"
+        mv -- "$binary_temp" "$real_binary"
         binary_temp=''
     fi
+
+    # Every agent integration reaches the binary through hook.sh as
+    # "bin/tmux-agent-sidebar hook ...", and only that subcommand creates
+    # /tmp/tmux-agent-activity_<pane>.log with agent commands in it. Run it with
+    # a private umask; everything else keeps the caller's umask.
+    binary_temp=$(mktemp "${binary%/*}/.tmux-agent-sidebar.XXXXXX") || die 'Could not create the sidebar wrapper.'
+    cat > "$binary_temp" <<EOF
+#!/bin/sh
+[ "\${1:-}" != hook ] || umask 077
+exec '$real_binary' "\$@"
+EOF
+    chmod 0755 -- "$binary_temp"
+    mv -- "$binary_temp" "$binary"
+    binary_temp=''
+    find /tmp -maxdepth 1 -type f -name 'tmux-agent-activity_*.log' -user "$(id -u)" -exec chmod 0600 {} +
 
     write_managed_block "$config_file" tmux-agent-sidebar <<EOF
 set -g @sidebar_auto_create on
@@ -97,6 +113,7 @@ EOF
         tmux source-file "$config_file"
     fi
     printf '%s\n' "tmux-agent-sidebar ${SIDEBAR_VERSION} is installed at ${install_dir}."
+    printf '%s\n' 'Agent activity logs under /tmp are created readable only by you.'
     printf '%s\n' 'Start Byobu with byobu-tmux, then use Alt-a e (or F12 e) to toggle the sidebar.'
     printf '%s\n' 'Configure agent integrations separately with installer/tmux_agent_sidebar_hooks.sh.'
 }
