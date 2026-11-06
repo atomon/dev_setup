@@ -157,6 +157,21 @@ Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ�
 installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するため、`sudo bash` では
 実行しません。共有リモートでも、各ユーザーの設定と保存データは独立しています。
 
+macOSでは `install.sh` がbash 4以降を必要とするため、Homebrewを用意してByobu installerを直接実行します。
+
+```bash
+bash installer/byobu.sh
+```
+
+macOSのByobuとtmuxは `brew install byobu` で導入し（Homebrewの解析送信は無効にして実行）、tmuxは依存として
+入るため `brew autoremove` の対象のままです。`Alt-a` をprefixとして使うには、端末でOptionをMetaとして
+送る設定が必要です（Ghostty: `macos-option-as-alt = true`、iTerm2: Left Option keyを `Esc+`、
+Terminal.app:「Optionキーをメタキーとして使用」）。`F12` は `fn` との同時押しが必要な場合があります。
+`byobu-resume` は `~/.local/bin` に入りますが、macOSの既定のPATHには含まれないため、`~/.zprofile` に
+`export PATH="$HOME/.local/bin:$PATH"` を追加するか、`~/.local/bin/byobu-resume` で実行します。
+installerはPATHに含まれていない場合に案内を表示します。
+macOSでの動作は実機で未検証です。
+
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
 `${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の
 再実行では、ローカル変更やローカルだけのcommit（stashやreflogにだけ残るものを含む）がなく同じupstreamを指す既存checkoutだけを、検証済みの新しいcheckoutへ置き換えます。3分ごとに

@@ -19,6 +19,37 @@ die() {
     exit 1
 }
 
+require_commands() {
+    local command
+
+    for command in "$@"; do
+        command -v "$command" >/dev/null 2>&1 || die "Missing required command: $command"
+    done
+}
+
+# tmux comes in as byobu's dependency, so the package manager can autoremove it
+# together with byobu.
+install_packages() {
+    local os=$1
+
+    case $os in
+        Linux)
+            require_commands apt-get sudo
+            sudo -v
+            sudo apt-get update
+            sudo apt-get install -y byobu
+            ;;
+        Darwin)
+            # Homebrew refuses to run as root.
+            require_commands brew
+            HOMEBREW_NO_ANALYTICS=1 brew install byobu
+            ;;
+        *)
+            die "Unsupported OS: $os"
+            ;;
+    esac
+}
+
 # Only an untouched checkout of the same upstream is replaced: no local changes
 # and no commits that exist only locally, including stashes and commits left
 # only in the reflog. Anything else stays for the user.
@@ -58,19 +89,14 @@ install_plugin() {
 }
 
 main() {
-    local data_home plugin_root resurrect_dir restore_helper
+    local os data_home plugin_root resurrect_dir restore_helper
     local config_dir config_file config_input config_temp backup
 
     (( EUID != 0 )) || die 'Run this installer as the target user, without sudo.'
     [[ -n ${HOME:-} && -d $HOME ]] || die 'A valid HOME directory is required.'
-    for command in apt-get git sudo; do
-        command -v "$command" >/dev/null 2>&1 || die "Missing required command: $command"
-    done
-
-    sudo -v
-    sudo apt-get update
-    # tmux comes in as byobu's dependency, so apt can autoremove it with byobu.
-    sudo apt-get install -y byobu
+    require_commands git
+    os=$(uname -s)
+    install_packages "$os"
     command -v tmux >/dev/null 2>&1 || die 'tmux was not installed.'
     command -v byobu-tmux >/dev/null 2>&1 || die 'byobu-tmux was not installed.'
 
@@ -147,6 +173,17 @@ main() {
     printf '%s\n' 'WARNING: Saved pane contents are unencrypted and can contain credentials or other sensitive data.'
     printf '%s\n' 'AI agent processes are not restarted.'
     printf '%s\n' 'Run byobu-resume to restore the latest saved session; normal byobu-tmux startup is fresh.'
+    if [[ :$PATH: != *":$HOME/.local/bin:"* ]]; then
+        printf 'NOTE: %s is not in PATH; run byobu-resume by its full path or add the directory to PATH.\n' "$HOME/.local/bin"
+        if [[ $os == Darwin ]]; then
+            printf '%s\n' "macOS (zsh): echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zprofile"
+        else
+            printf '%s\n' "Ubuntu's default ~/.profile adds it at the next login."
+        fi
+    fi
+    if [[ $os == Darwin ]]; then
+        printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = true).'
+    fi
 }
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
