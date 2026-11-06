@@ -518,7 +518,7 @@ case "$*" in
                               capture_output=True, text=True)
 
     def test_byobu_script_configures_private_user_scoped_session_restore(self) -> None:
-        """利用者専用の復元設定・plugin の固定版検証・未変更 checkout に限った置き換え"""
+        """利用者専用の復元設定・plugin の固定版検証・未変更 checkout に限った置き換え・macOS の Homebrew 経路"""
         result = subprocess.run(['bash', '-n', str(self.INSTALLER)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.INSTALLER.read_text()
@@ -537,8 +537,10 @@ case "$*" in
             log.touch()
             mocks = {
                 'apt-get': ':',
+                'brew': '[[ ${HOMEBREW_NO_ANALYTICS:-} == 1 ]]',
                 'byobu-tmux': ':',
                 'sudo': '[[ $1 == -v ]] && exit 0; "$@"',
+                'uname': '[[ $1 == -s ]] && echo "${TEST_UNAME:-Linux}"',
                 'tmux': '[[ $1 == -V ]] && echo "tmux 3.4"',
                 'git': '''if [[ $1 == clone ]]; then
     destination=${!#}
@@ -603,6 +605,18 @@ fi''',
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(clone_count(), 2)
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-byobu-session-restore.*')))
+            self.assertNotIn('macos-option-as-alt', result.stdout)
+
+            calls = len(log.read_text().splitlines())
+            result = run_installer(TEST_UNAME='Darwin')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('macos-option-as-alt', result.stdout)
+            darwin_calls = log.read_text().splitlines()[calls:]
+            self.assertIn('brew install byobu', darwin_calls)
+            self.assertFalse([call for call in darwin_calls if call.startswith(('sudo ', 'apt-get '))])
+            result = run_installer(TEST_UNAME='FreeBSD')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Unsupported OS: FreeBSD', result.stderr)
 
             plugins = data / 'tmux-plugins'
             marker = plugins / 'tmux-resurrect/previous-version'
