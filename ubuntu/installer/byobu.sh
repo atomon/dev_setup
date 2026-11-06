@@ -183,7 +183,7 @@ main() {
         fi
     fi
     if [[ $os == Darwin ]]; then
-        printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = true).'
+        printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = left keeps Right Option for characters such as \ on JIS keyboards).'
     fi
 }
 

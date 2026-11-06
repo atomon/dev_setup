@@ -165,12 +165,15 @@ bash installer/byobu.sh
 
 macOSのByobuとtmuxは `brew install byobu` で導入し（Homebrewの解析送信は無効にして実行）、tmuxは依存として
 入るため `brew autoremove` の対象のままです。`Alt-a` をprefixとして使うには、端末でOptionをMetaとして
-送る設定が必要です（Ghostty: `macos-option-as-alt = true`、iTerm2: Left Option keyを `Esc+`、
-Terminal.app:「Optionキーをメタキーとして使用」）。`F12` は `fn` との同時押しが必要な場合があります。
+送る設定が必要です（Ghostty: `macos-option-as-alt = left`、iTerm2: Left Option keyを `Esc+`、
+Terminal.app:「Optionキーをメタキーとして使用」）。左Optionだけを指定すると、右OptionはJISキーボードの `\` など
+文字入力用に残ります。`F12` は `fn` との同時押しが必要な場合があります。
 `byobu-resume` は `~/.local/bin` に入りますが、macOSの既定のPATHには含まれないため、`~/.zprofile` に
 `export PATH="$HOME/.local/bin:$PATH"` を追加するか、`~/.local/bin/byobu-resume` で実行します。
 installerはPATHに含まれていない場合に案内を表示します。
-macOSでの動作は実機で未検証です。
+macOS（Apple Silicon、Homebrewのtmux 3.8、Ghostty）の実機で、導入、`Alt-a` 操作、自動保存、
+`byobu-resume` による復元を確認済みです。tmux-agent-sidebar installerはLinux用バイナリだけを取得するため、
+macOSでは使用できません。
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
 `${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の
