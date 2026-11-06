@@ -522,7 +522,7 @@ case "$*" in
         result = subprocess.run(['bash', '-n', str(self.INSTALLER)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.INSTALLER.read_text()
-        for expected in ('sudo apt-get install -y tmux byobu', "RESURRECT_VERSION='v4.0.0'",
+        for expected in ('sudo apt-get install -y byobu', "RESURRECT_VERSION='v4.0.0'",
                          "CONTINUUM_VERSION='v3.1.0'", 'Run this installer as the target user, without sudo.'):
             self.assertIn(expected, text)
 

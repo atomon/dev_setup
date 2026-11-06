@@ -152,7 +152,8 @@ bash install.sh -i byobu
 bash install.sh -i tmux_agent_sidebar
 ```
 
-Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ導入します。`byobu`
+Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ導入します。tmux は byobu の依存として
+自動導入扱いのまま入るため、byobu を削除すると `apt autoremove` で一緒に削除されます。`byobu`
 installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するため、`sudo bash` では
 実行しません。共有リモートでも、各ユーザーの設定と保存データは独立しています。
 

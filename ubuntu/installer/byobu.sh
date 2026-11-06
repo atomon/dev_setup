@@ -67,7 +67,8 @@ main() {
 
     sudo -v
     sudo apt-get update
-    sudo apt-get install -y tmux byobu
+    # tmux comes in as byobu's dependency, so apt can autoremove it with byobu.
+    sudo apt-get install -y byobu
     command -v tmux >/dev/null 2>&1 || die 'tmux was not installed.'
     command -v byobu-tmux >/dev/null 2>&1 || die 'byobu-tmux was not installed.'
 
