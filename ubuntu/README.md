@@ -157,24 +157,30 @@ installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するた
 実行しません。共有リモートでも、各ユーザーの設定と保存データは独立しています。
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
-`${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。3分ごとに
+`${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の
+再実行では、ローカル変更がなく同じupstreamを指す既存checkoutだけを、検証済みの新しいcheckoutへ置き換えます。3分ごとに
 session/window/pane構成と作業ディレクトリを `${XDG_DATA_HOME:-~/.local/share}/tmux/resurrect/`
 へ保存します。通常の `byobu-tmux` は新規sessionを開始し、`byobu-resume` を実行した場合だけ
 最新の `last` を復元します。既存tmux serverに保存済みsessionがなければ、安全のため復元せず
 エラーにします。保存先は owner 専用で、
 既定の `~/.tmux/resurrect/` ではありません。
 `byobu-resume` で起動したtmux serverは復元完了まで自動保存を停止し、復元失敗時に空sessionで正常な
-保存データを上書きしないようにします。復元処理終了後は3分間隔の自動保存を再開します。
+保存データを上書きしないようにします。復元処理終了後は3分間隔の自動保存を再開します。復元が完了しなかった
+場合は自動保存を停止したままにし、tmuxのメッセージで通知します。
+tmux-continuum v3.1.0は、起動時に同じホスト上で別のtmux process（他ユーザーのものを含む）が動いていると
+自動保存を開始しません。共有リモートではこの場合、手動保存を使ってください。
 tmux-agent-sidebarを併用する場合は、復元中の自動生成hookを一時停止し、保存されていたsidebar
 paneを破棄してから各windowに1つだけsidebarを再生成します。
-paneの画面内容とshell historyも保存・復元します。ただし、これらは暗号化されず、画面や
-コマンド履歴に表示されたcredential、token、顧客情報などの機密情報を含む可能性があります。
+paneの画面内容も保存・復元します。ただし、これは暗号化されず、画面に表示された
+credential、token、顧客情報などの機密情報を含む可能性があります。
 保存先ディレクトリはowner専用です。
 AI agentのprocessや会話状態は保存・再実行しないため、Codex/Claude/OpenCodeが復元時に
 自動起動して外部サービスへ接続することはありません。初回導入時のみGitHubからpluginを取得します。
 tmuxのmouse modeも有効になるため、paneの選択・リサイズ・スクロールをマウスで操作できます。
 GhosttyからByobu/tmux内のCodexへShift+Enterを区別して渡せるように、Ghosttyのextended-key
 対応をtmuxへ宣言し、CSI u形式で動的に有効化します。Codex側ではShift+Enterを改行へ割り当てて使用できます。
+CSI u形式の指定（`extended-keys-format`）はtmux 3.5以降だけで有効で、tmux 3.4（Ubuntu 24.04）では
+無視され、tmux既定の形式で送られます。
 手動保存は `Ctrl-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
 `byobu-resume` を実行します。`Ctrl-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
 
