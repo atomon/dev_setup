@@ -160,7 +160,7 @@ installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するた
 **macOSの手順**
 
 macOSでは `install.sh` がbash 4以降を必要とするため、Byobu installerを直接実行します。
-tmux-agent-sidebar installerはLinux用バイナリだけを取得するため、macOSでは使用できません。
+tmux-agent-sidebar installerもmacOS（x86_64 / arm64）用バイナリに対応しています（macOSの実機では未確認）。
 
 1. Homebrewとgitを用意します。ByobuとtmuxはinstallerがHomebrewの解析送信を無効にして
    `brew install byobu` で導入します。tmuxは依存として入るため `brew autoremove` の対象のままです。
@@ -231,9 +231,12 @@ prefixはshellの行頭移動（`Ctrl-a`）と衝突しない `Alt-a` に変更�
 
 tmux-agent-sidebar v0.13.0 は
 `${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの
-SHA-256とソースの固定commitを検証します。Byobu設定は `~/.byobu/.tmux.conf` の
-`dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し、変更前の設定は
-タイムスタンプ付きでバックアップします。共有リモートホストでも、他ユーザーの
+SHA-256とソースの固定commitを検証します。配置済みのバイナリが固定SHA-256と一致する場合は再ダウンロード
+しません。固定バージョンを更新した後の再実行では、Byobu installerと同じ条件で既存checkoutを置き換えます。
+Byobu設定は `~/.byobu/.tmux.conf` の `dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し
+（既存のブロックはその場で更新し、他の管理ブロックとの順序は変えません）、変更前の設定は
+タイムスタンプ付きでバックアップします。macOS（x86_64 / arm64）では `bash installer/tmux_agent_sidebar.sh`
+を直接実行します。共有リモートホストでも、他ユーザーの
 設定やシステムパッケージには触れません。
 
 ByobuのScreen backendは対象外です。sidebarは新規windowに自動作成されます。下部の
@@ -256,8 +259,13 @@ bash installer/tmux_agent_sidebar_hooks.sh --agent claude
 
 Codex連携には安全なJSONマージのため `python3` が必要です。Claude Codeは、現在の上流推奨に
 従い `~/.claude/settings.json` へlegacy hookを書き込まず、Claude Code内でpluginを導入します。
-各agentを再起動してから状態表示を確認してください。Activityログを有効にする場合は、agentの
-hook情報が `/tmp/tmux-agent-activity_<pane>.log` に保存されるため、共有ホストの`/tmp`運用も確認してください。
+各agentを再起動してから状態表示を確認してください。Activityログを有効にする場合は、agentが実行した
+コマンドやファイルパスが `/tmp/tmux-agent-activity_<pane>.log` に保存されます。installerは
+`bin/tmux-agent-sidebar` を、hook処理のときだけ `umask 077` で検証済みバイナリ（`.real`）を実行する
+ラッパーにするため、ログは本人だけが読める権限（0600）で作られます（その他の処理の権限は変えません）。
+Claude Codeはpluginキャッシュに `bin/` をコピーして使うため、ラッパー導入前のバイナリがキャッシュに
+残っている場合は、installerがラッパーに置き換えます。
+ファイル名はpane番号で決まるため、共有ホストでは他ユーザーとの名前の衝突にも注意してください。
 
 ## NVIDIA GPU を Docker で使用する
 

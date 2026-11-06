@@ -14,18 +14,7 @@ readonly CONTINUUM_VERSION='v3.1.0'
 readonly CONTINUUM_COMMIT='46e0e0023476018ddb4cc0d44783eede27e5a8ec'
 readonly CONTINUUM_REPOSITORY='https://github.com/tmux-plugins/tmux-continuum.git'
 
-die() {
-    printf 'ERROR: %s\n' "$*" >&2
-    exit 1
-}
-
-require_commands() {
-    local command
-
-    for command in "$@"; do
-        command -v "$command" >/dev/null 2>&1 || die "Missing required command: $command"
-    done
-}
+source "$SCRIPT_DIR/utils/byobu_common.sh"
 
 # tmux comes in as byobu's dependency, so the package manager can autoremove it
 # together with byobu.
@@ -50,47 +39,8 @@ install_packages() {
     esac
 }
 
-# Only an untouched checkout of the same upstream is replaced: no local changes
-# and no commits that exist only locally, including stashes and commits left
-# only in the reflog. Anything else stays for the user.
-is_pristine_checkout() {
-    local directory=$1 repository=$2 changes local_commits
-
-    [[ $(git -C "$directory" remote get-url origin 2>/dev/null || true) == "$repository" ]] || return 1
-    changes=$(git -C "$directory" status --porcelain 2>/dev/null) || return 1
-    local_commits=$(git -C "$directory" rev-list --count --all --reflog --not --remotes --tags 2>/dev/null) || return 1
-    [[ -z $changes && $local_commits == 0 ]]
-}
-
-install_plugin() {
-    local name=$1 version=$2 commit=$3 repository=$4 plugin_root=$5 destination work
-
-    destination="$plugin_root/$name"
-    if [[ -e $destination ]]; then
-        [[ -d $destination/.git ]] || die "$destination exists but is not a Git checkout."
-        [[ $(git -C "$destination" rev-parse HEAD 2>/dev/null || true) != "$commit" ]] || return 0
-        is_pristine_checkout "$destination" "$repository" || \
-            die "$destination is not the expected $version and has local changes, local-only commits, or another origin; preserve it or move it before installing."
-    fi
-
-    work=$(mktemp -d "$plugin_root/.${name}.XXXXXX") || die "Could not create a temporary $name directory."
-    if ! git clone --depth 1 --branch "$version" "$repository" "$work/new"; then
-        rm -rf -- "$work"
-        die "Could not clone $name."
-    fi
-    if [[ $(git -C "$work/new" rev-parse HEAD) != "$commit" ]]; then
-        rm -rf -- "$work"
-        die "$name source does not match the expected $version commit."
-    fi
-    [[ ! -e $destination ]] || mv -- "$destination" "$work/previous"
-    mv -- "$work/new" "$destination"
-    [[ ! -e $work/previous ]] || printf 'Updated %s to %s\n' "$name" "$version"
-    rm -rf -- "$work"
-}
-
 main() {
-    local os data_home plugin_root resurrect_dir restore_helper
-    local config_dir config_file config_input config_temp backup
+    local os data_home plugin_root resurrect_dir restore_helper config_file
 
     (( EUID != 0 )) || die 'Run this installer as the target user, without sudo.'
     [[ -n ${HOME:-} && -d $HOME ]] || die 'A valid HOME directory is required.'
@@ -105,8 +55,7 @@ main() {
     plugin_root="$data_home/tmux-plugins"
     resurrect_dir="$data_home/tmux/resurrect"
     restore_helper="$data_home/byobu-session-restore/restore-after-attach.sh"
-    config_dir="$HOME/.byobu"
-    config_file="$config_dir/.tmux.conf"
+    config_file="$HOME/.byobu/.tmux.conf"
     mkdir -p -- "$plugin_root" "$resurrect_dir" "${restore_helper%/*}" "$HOME/.local/bin"
     # macOS chmod treats -- after the mode as a file name.
     chmod 0700 "$plugin_root" "$resurrect_dir" "${restore_helper%/*}"
@@ -116,56 +65,28 @@ main() {
     install_plugin tmux-resurrect "$RESURRECT_VERSION" "$RESURRECT_COMMIT" "$RESURRECT_REPOSITORY" "$plugin_root"
     install_plugin tmux-continuum "$CONTINUUM_VERSION" "$CONTINUUM_COMMIT" "$CONTINUUM_REPOSITORY" "$plugin_root"
 
-    mkdir -p -- "$config_dir"
-    config_input=/dev/null
-    [[ ! -f $config_file ]] || config_input=$config_file
-    config_temp=$(mktemp "$config_dir/.byobu-session-restore.XXXXXX") || die 'Could not create a temporary Byobu configuration.'
-    if ! awk -v save_interval="$SAVE_INTERVAL_MINUTES" \
-        -v resurrect_dir="$resurrect_dir" \
-        -v resurrect="$plugin_root/tmux-resurrect/resurrect.tmux" \
-        -v continuum="$plugin_root/tmux-continuum/continuum.tmux" \
-        -v restore_helper="$restore_helper" '
-        /^# >>> dev_setup byobu-session-restore >>>$/ { managed = 1; next }
-        /^# <<< dev_setup byobu-session-restore <<<$/ { managed = 0; next }
-        !managed { print }
-        END {
-            print "# >>> dev_setup byobu-session-restore >>>"
-            print "set -g mouse on"
-            print "set -g prefix M-a"
-            print "unbind-key -n C-a"
-            print "bind-key M-a send-prefix"
-            print "set -s extended-keys on"
-            print "set -sq extended-keys-format csi-u"
-            print "set -s terminal-features[100] \047xterm-ghostty:extkeys\047"
-            print "set -g @resurrect-dir \047" resurrect_dir "\047"
-            print "set -g @resurrect-processes false"
-            print "set -g @resurrect-capture-pane-contents on"
-            print "set -g @continuum-save-interval " save_interval
-            print "set -g @continuum-restore off"
-            print "set -g @continuum-boot off"
-            print "if-shell -F \047#{!=:#{DEV_SETUP_BYOBU_RESUME_SESSION},}\047 \047set -g @continuum-save-interval 0\047"
-            print "set-hook -g after-new-session[900] \047run-shell -b \042" restore_helper " " save_interval "\042\047"
-            print "run-shell \047" resurrect "\047"
-            print "run-shell \047" continuum "\047"
-            print "# <<< dev_setup byobu-session-restore <<<"
-        }
-    ' "$config_input" > "$config_temp"; then
-        rm -f -- "$config_temp"
-        die 'Could not create the Byobu configuration.'
-    fi
-    if [[ ! -f $config_file ]] || ! cmp -s "$config_temp" "$config_file"; then
-        if [[ -f $config_file ]]; then
-            backup="$config_file.before-byobu-session-restore.$(date +%Y%m%d%H%M%S)"
-            cp -p -- "$config_file" "$backup"
-            printf 'Backed up %s\n' "$backup"
-        fi
-        mv -- "$config_temp" "$config_file"
-    else
-        rm -f -- "$config_temp"
-    fi
+    write_managed_block "$config_file" byobu-session-restore <<EOF
+set -g mouse on
+set -g prefix M-a
+unbind-key -n C-a
+bind-key M-a send-prefix
+set -s extended-keys on
+set -sq extended-keys-format csi-u
+set -s terminal-features[100] 'xterm-ghostty:extkeys'
+set -g @resurrect-dir '$resurrect_dir'
+set -g @resurrect-processes false
+set -g @resurrect-capture-pane-contents on
+set -g @continuum-save-interval $SAVE_INTERVAL_MINUTES
+set -g @continuum-restore off
+set -g @continuum-boot off
+if-shell -F '#{!=:#{DEV_SETUP_BYOBU_RESUME_SESSION},}' 'set -g @continuum-save-interval 0'
+set-hook -g after-new-session[900] 'run-shell -b "$restore_helper $SAVE_INTERVAL_MINUTES"'
+run-shell '$plugin_root/tmux-resurrect/resurrect.tmux'
+run-shell '$plugin_root/tmux-continuum/continuum.tmux'
+EOF
 
     if [[ -n ${TMUX:-} ]]; then
-        tmux source-file "$HOME/.byobu/.tmux.conf"
+        tmux source-file "$config_file"
     fi
     tmux -V
     printf '%s\n' 'Byobu and tmux are installed system-wide.'

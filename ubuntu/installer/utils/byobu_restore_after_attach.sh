@@ -48,7 +48,7 @@ if [[ -n $sidebar_config ]]; then
         if [[ $(tmux display-message -p -t "$saved_pane" '#{window_panes}' 2>/dev/null || true) -gt 1 ]]; then
             tmux kill-pane -t "$saved_pane"
         fi
-    done < <(awk -F '\t' '$1 == "pane" && $10 == "tmux-agent-sidebar" { print $2 ":" $3 "." $6 }' "$resurrect_dir/last")
+    done < <(awk -F '\t' '$1 == "pane" && ($10 == "tmux-agent-sidebar" || $10 == "tmux-agent-sidebar.real") { print $2 ":" $3 "." $6 }' "$resurrect_dir/last")
 
     tmux set-option -g @sidebar_auto_create "${sidebar_auto_create:-on}"
     tmux source-file "$sidebar_config"
