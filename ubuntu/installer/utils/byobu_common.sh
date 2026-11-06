@@ -52,11 +52,28 @@ install_plugin() {
     rm -rf -- "$work"
 }
 
+# Move TEMP over FILE unless they already match. A changed FILE is backed up
+# first as FILE.before-NAME.<timestamp>.
+replace_with_backup() {
+    local temp=$1 file=$2 name=$3 backup
+
+    if [[ -f $file ]] && cmp -s "$temp" "$file"; then
+        rm -f -- "$temp"
+        return
+    fi
+    if [[ -f $file ]]; then
+        backup="$file.before-$name.$(date +%Y%m%d%H%M%S)"
+        cp -p -- "$file" "$backup"
+        printf 'Backed up %s\n' "$backup"
+    fi
+    mv -- "$temp" "$file"
+}
+
 # Write stdin as the "dev_setup NAME" block of a tmux configuration. An existing
 # block is replaced where it stands, so blocks owned by other installers keep
 # their order; a new block is appended. A changed file is backed up first.
 write_managed_block() {
-    local config_file=$1 name=$2 block config_input config_temp backup
+    local config_file=$1 name=$2 block config_input config_temp
 
     block=$(cat)
     mkdir -p -- "${config_file%/*}"
@@ -73,14 +90,5 @@ write_managed_block() {
         rm -f -- "$config_temp"
         die "Could not create the $name configuration."
     fi
-    if [[ -f $config_file ]] && cmp -s "$config_temp" "$config_file"; then
-        rm -f -- "$config_temp"
-        return
-    fi
-    if [[ -f $config_file ]]; then
-        backup="$config_file.before-$name.$(date +%Y%m%d%H%M%S)"
-        cp -p -- "$config_file" "$backup"
-        printf 'Backed up %s\n' "$backup"
-    fi
-    mv -- "$config_temp" "$config_file"
+    replace_with_backup "$config_temp" "$config_file" "$name"
 }

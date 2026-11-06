@@ -57,7 +57,6 @@ main() {
     restore_helper="$data_home/byobu-session-restore/restore-after-attach.sh"
     config_file="$HOME/.byobu/.tmux.conf"
     mkdir -p -- "$plugin_root" "$resurrect_dir" "${restore_helper%/*}" "$HOME/.local/bin"
-    # macOS chmod treats -- after the mode as a file name.
     chmod 0700 "$plugin_root" "$resurrect_dir" "${restore_helper%/*}"
     install -m 0700 -- "$SCRIPT_DIR/utils/byobu_restore_after_attach.sh" "$restore_helper"
     install -m 0700 -- "$SCRIPT_DIR/utils/byobu_resume.sh" "$HOME/.local/bin/byobu-resume"

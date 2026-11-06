@@ -160,7 +160,7 @@ installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するた
 **macOSの手順**
 
 macOSでは `install.sh` がbash 4以降を必要とするため、Byobu installerを直接実行します。
-tmux-agent-sidebar installerもmacOS（x86_64 / arm64）用バイナリに対応しています（macOSの実機では未確認）。
+tmux-agent-sidebar installerもmacOS（x86_64 / arm64）に対応しており、`bash installer/tmux_agent_sidebar.sh` を直接実行します。
 
 1. Homebrewとgitを用意します。ByobuとtmuxはinstallerがHomebrewの解析送信を無効にして
    `brew install byobu` で導入します。tmuxは依存として入るため `brew autoremove` の対象のままです。
@@ -174,6 +174,7 @@ tmux-agent-sidebar installerもmacOS（x86_64 / arm64）用バイナリに対応
 
 3. `Alt-a` をprefixとして使うため、端末でOptionをMeta（Alt）として送る設定をします。
    Ghosttyで左Optionだけを指定すると、右OptionはJISキーボードの `\` など文字入力用に残ります。
+   予備の `F12` は `fn` との同時押しが必要な場合があります。
 
    | 端末 | 設定 |
    |---|---|
@@ -188,16 +189,8 @@ tmux-agent-sidebar installerもmacOS（x86_64 / arm64）用バイナリに対応
    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile
    ```
 
-| 操作 | キー / コマンド |
-|---|---|
-| 起動 | `byobu`（毎回新規sessionで開始） |
-| prefix | 左Option + `a`（予備の `F12` は `fn` との同時押しが必要な場合があります） |
-| 新規window | `Alt-a c` |
-| 手動保存 | `Alt-a Ctrl-s`（自動保存は3分ごと） |
-| 最後に保存した状態を復元 | tmux serverがない状態で `byobu-resume` |
-
 macOS（Apple Silicon、Homebrewのtmux 3.8、Ghostty）の実機で、導入、`Alt-a` 操作、自動保存、
-`byobu-resume` による復元を確認済みです。
+`byobu-resume` による復元、tmux-agent-sidebarの表示を確認済みです。
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
 `${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の
@@ -224,10 +217,13 @@ GhosttyからByobu/tmux内のCodexへShift+Enterを区別して渡せるよう�
 対応をtmuxへ宣言し、CSI u形式で動的に有効化します。Codex側ではShift+Enterを改行へ割り当てて使用できます。
 CSI u形式の指定（`extended-keys-format`）はtmux 3.5以降だけで有効で、tmux 3.4（Ubuntu 24.04）では
 無視され、tmux既定の形式で送られます。
-prefixはshellの行頭移動（`Ctrl-a`）と衝突しない `Alt-a` に変更し、Byobu既定の `F12` も予備として残します。
-`Alt-a` 自体をアプリへ送るときは `Alt-a` を2回押します。
-手動保存は `Alt-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
-`byobu-resume` を実行します。`Alt-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
+
+| 操作 | キー / コマンド |
+|---|---|
+| prefix | `Alt-a`（shellの行頭移動 `Ctrl-a` と衝突しないため。Byobu既定の `F12` も予備として残し、`Alt-a` 自体をアプリへ送るときは2回押す） |
+| 新規window | `Alt-a c` |
+| 手動保存 | `Alt-a Ctrl-s` |
+| 最後に保存した状態を復元 | tmux serverがない状態で `byobu-resume`（起動済みserver内ではtmux-resurrect標準の `Alt-a Ctrl-r`） |
 
 tmux-agent-sidebar v0.13.0 は
 `${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの
@@ -235,8 +231,7 @@ SHA-256とソースの固定commitを検証します。配置済みのバイナ�
 しません。固定バージョンを更新した後の再実行では、Byobu installerと同じ条件で既存checkoutを置き換えます。
 Byobu設定は `~/.byobu/.tmux.conf` の `dev_setup tmux-agent-sidebar` 管理ブロックだけを作成・更新し
 （既存のブロックはその場で更新し、他の管理ブロックとの順序は変えません）、変更前の設定は
-タイムスタンプ付きでバックアップします。macOS（x86_64 / arm64）では `bash installer/tmux_agent_sidebar.sh`
-を直接実行します。共有リモートホストでも、他ユーザーの
+タイムスタンプ付きでバックアップします。共有リモートホストでも、他ユーザーの
 設定やシステムパッケージには触れません。
 
 ByobuのScreen backendは対象外です。sidebarは新規windowに自動作成されます。下部の
@@ -247,7 +242,7 @@ Activity/Gitパネルは20行で表示され、sidebar内で `Shift+Tab` を押�
 agent連携は別スクリプトで、必要なものだけ有効にします。
 
 ```bash
-# Codex: ~/.codex/hooks.json をバックアップしてマージし、config.toml の feature を有効化
+# Codex: ~/.codex/hooks.json をバックアップしてマージし、config.toml で hook を有効化・daemon の自動起動を無効化
 bash installer/tmux_agent_sidebar_hooks.sh --agent codex
 
 # OpenCode: ~/.config/opencode/plugins/ にユーザー単位の symlink を作成
@@ -256,6 +251,12 @@ bash installer/tmux_agent_sidebar_hooks.sh --agent opencode
 # Claude Code: 上流推奨の plugin 導入コマンドを表示
 bash installer/tmux_agent_sidebar_hooks.sh --agent claude
 ```
+
+Codex 0.157以降の共有daemonは、hookを最初に起動したshellの環境変数で実行するため、paneごとの `TMUX_PANE` が
+渡りません（[openai/codex#48500](https://github.com/openai/codex/issues/48500)）。そのため `--agent codex` は
+`config.toml` に `daemon_auto_start = false` も設定します。daemonが動いているとinstallerが案内するので、
+`codex app-server daemon stop` で停止してください（実行中の作業は中断されます）。`codex agents`（`--no-daemon`
+なし）などでdaemonが再び起動してsidebarが更新されなくなった場合も、`--agent codex` を再実行すると確認できます。
 
 Codex連携には安全なJSONマージのため `python3` が必要です。Claude Codeは、現在の上流推奨に
 従い `~/.claude/settings.json` へlegacy hookを書き込まず、Claude Code内でpluginを導入します。
