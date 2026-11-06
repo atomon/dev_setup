@@ -242,7 +242,7 @@ Activity/Gitパネルは20行で表示され、sidebar内で `Shift+Tab` を押�
 agent連携は別スクリプトで、必要なものだけ有効にします。
 
 ```bash
-# Codex: ~/.codex/hooks.json をバックアップしてマージし、config.toml の feature を有効化
+# Codex: ~/.codex/hooks.json をバックアップしてマージし、config.toml で hook を有効化・daemon の自動起動を無効化
 bash installer/tmux_agent_sidebar_hooks.sh --agent codex
 
 # OpenCode: ~/.config/opencode/plugins/ にユーザー単位の symlink を作成
@@ -251,6 +251,12 @@ bash installer/tmux_agent_sidebar_hooks.sh --agent opencode
 # Claude Code: 上流推奨の plugin 導入コマンドを表示
 bash installer/tmux_agent_sidebar_hooks.sh --agent claude
 ```
+
+Codex 0.157以降の共有daemonは、hookを最初に起動したshellの環境変数で実行するため、paneごとの `TMUX_PANE` が
+渡りません（[openai/codex#48500](https://github.com/openai/codex/issues/48500)）。そのため `--agent codex` は
+`config.toml` に `daemon_auto_start = false` も設定します。daemonが動いているとinstallerが案内するので、
+`codex app-server daemon stop` で停止してください（実行中の作業は中断されます）。`codex agents`（`--no-daemon`
+なし）などでdaemonが再び起動してsidebarが更新されなくなった場合も、`--agent codex` を再実行すると確認できます。
 
 Codex連携には安全なJSONマージのため `python3` が必要です。Claude Codeは、現在の上流推奨に
 従い `~/.claude/settings.json` へlegacy hookを書き込まず、Claude Code内でpluginを導入します。

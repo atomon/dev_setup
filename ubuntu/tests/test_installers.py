@@ -1001,6 +1001,7 @@ fi
             (codex_dir / 'config.toml').write_text(
                 '[features]\n'
                 'codex_hooks = false\n'
+                'daemon_auto_start = true\n'
                 'multi_agent = true\n'
             )
             env = os.environ | {'HOME': str(home), 'XDG_DATA_HOME': str(data),
@@ -1012,6 +1013,8 @@ fi
             config = (home / '.codex/config.toml').read_text()
             self.assertIn('hooks = true', config)
             self.assertNotIn('codex_hooks', config)
+            self.assertEqual(config.count('daemon_auto_start'), 1)
+            self.assertIn('daemon_auto_start = false', config)
             self.assertIn('multi_agent = true', config)
             hooks = (home / '.codex/hooks.json').read_text()
             self.assertEqual(hooks.count('bash hook.sh codex session-start'), 1)

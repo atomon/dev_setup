@@ -4,24 +4,23 @@
 # writes only to the invoking user's agent configuration directories.
 set -Eeuo pipefail
 
-die() {
-    printf 'ERROR: %s\n' "$*" >&2
-    exit 1
-}
+readonly SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/utils/byobu_common.sh"
 
 usage() {
     cat <<'HELP'
 Usage: bash tmux_agent_sidebar_hooks.sh --agent AGENT [--agent AGENT ...]
 
 Agents:
-  codex     Merge the sidebar hooks into ~/.codex/hooks.json.
+  codex     Merge the sidebar hooks into ~/.codex/hooks.json and turn off the
+            shared daemon's automatic start.
   claude    Print the supported Claude Code plugin commands; run them in Claude.
   opencode  Create the user-level OpenCode plugin symlink.
 HELP
 }
 
 configure_codex() {
-    local config_dir config_file setup_json temporary backup config_input
+    local config_dir config_file setup_json temporary config_input
     config_dir=${CODEX_HOME:-"$HOME/.codex"}
     config_file="$config_dir/config.toml"
     mkdir -p -- "$config_dir"
@@ -85,35 +84,37 @@ PY
     fi
     rm -f -- "$setup_json"
 
+    # The shared daemon runs hooks with the environment of the shell that
+    # started it, so TMUX_PANE points at the wrong pane. Without the daemon,
+    # each TUI hosts its own app server and hooks inherit that pane's variables.
     if [[ ! -f $config_file ]] || ! awk '
         /^[[:space:]]*\[features\][[:space:]]*(#.*)?$/ { inside = 1; next }
         /^[[:space:]]*\[/ { inside = 0 }
-        inside && /^[[:space:]]*hooks[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)?$/ { canonical = 1 }
+        inside && /^[[:space:]]*hooks[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)?$/ { hooks = 1 }
+        inside && /^[[:space:]]*daemon_auto_start[[:space:]]*=[[:space:]]*false([[:space:]]*(#.*)?)?$/ { daemon = 1 }
         inside && /^[[:space:]]*codex_hooks[[:space:]]*=/ { deprecated = 1 }
-        END { exit(canonical && !deprecated ? 0 : 1) }
+        END { exit(hooks && daemon && !deprecated ? 0 : 1) }
     ' "$config_file"; then
         config_input=/dev/null
         [[ ! -f $config_file ]] || config_input=$config_file
         temporary=$(mktemp "$config_dir/.config.toml.XXXXXX") || die 'Could not create a temporary Codex configuration.'
         awk '
-            function add_setting() { if (!setting) print "hooks = true"; setting = 1 }
+            function add_settings() { if (!added) { print "hooks = true"; print "daemon_auto_start = false" } added = 1 }
             /^[[:space:]]*\[features\][[:space:]]*(#.*)?$/ { seen = 1; inside = 1; print; next }
-            inside && /^[[:space:]]*\[/ { add_setting(); inside = 0 }
-            inside && /^[[:space:]]*hooks[[:space:]]*=/ { add_setting(); next }
-            inside && /^[[:space:]]*codex_hooks[[:space:]]*=/ { add_setting(); next }
+            inside && /^[[:space:]]*\[/ { add_settings(); inside = 0 }
+            inside && /^[[:space:]]*(codex_hooks|hooks|daemon_auto_start)[[:space:]]*=/ { add_settings(); next }
             { print }
             END {
-                if (inside) add_setting()
-                if (!seen) { print ""; print "[features]"; print "hooks = true" }
+                if (inside) add_settings()
+                if (!seen) { print ""; print "[features]"; add_settings() }
             }
         ' "$config_input" > "$temporary"
-        if [[ -f $config_file ]]; then
-            backup="$config_file.before-tmux-agent-sidebar.$(date +%Y%m%d%H%M%S)"
-            cp -p -- "$config_file" "$backup"
-            printf 'Backed up %s\n' "$backup"
-        fi
-        mv -- "$temporary" "$config_file"
-        printf 'Enabled Codex hooks in %s\n' "$config_file"
+        replace_with_backup "$temporary" "$config_file" tmux-agent-sidebar
+        printf 'Enabled Codex hooks and disabled the shared daemon autostart in %s\n' "$config_file"
+    fi
+    # A daemon that is already running keeps serving new TUIs.
+    if [[ -S $config_dir/app-server-control/app-server-control.sock ]]; then
+        printf '%s\n' 'A shared Codex daemon is running. Stop it with "codex app-server daemon stop" (this interrupts its running work).'
     fi
     printf '%s\n' 'Restart Codex before expecting sidebar status updates.'
 }
