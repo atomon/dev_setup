@@ -157,20 +157,47 @@ Byobu と tmux は Ubuntu の APT パッケージとしてシステム全体へ�
 installerは利用者の `~/.byobu/.tmux.conf` に復元設定も追加するため、`sudo bash` では
 実行しません。共有リモートでも、各ユーザーの設定と保存データは独立しています。
 
-macOSでは `install.sh` がbash 4以降を必要とするため、Homebrewを用意してByobu installerを直接実行します。
+**macOSの手順**
 
-```bash
-bash installer/byobu.sh
-```
+macOSでは `install.sh` がbash 4以降を必要とするため、Byobu installerを直接実行します。
+tmux-agent-sidebar installerもmacOS（x86_64 / arm64）用バイナリに対応しています（macOSの実機では未確認）。
 
-macOSのByobuとtmuxは `brew install byobu` で導入し（Homebrewの解析送信は無効にして実行）、tmuxは依存として
-入るため `brew autoremove` の対象のままです。`Alt-a` をprefixとして使うには、端末でOptionをMetaとして
-送る設定が必要です（Ghostty: `macos-option-as-alt = true`、iTerm2: Left Option keyを `Esc+`、
-Terminal.app:「Optionキーをメタキーとして使用」）。`F12` は `fn` との同時押しが必要な場合があります。
-`byobu-resume` は `~/.local/bin` に入りますが、macOSの既定のPATHには含まれないため、`~/.zprofile` に
-`export PATH="$HOME/.local/bin:$PATH"` を追加するか、`~/.local/bin/byobu-resume` で実行します。
-installerはPATHに含まれていない場合に案内を表示します。
-macOSでの動作は実機で未検証です。
+1. Homebrewとgitを用意します。ByobuとtmuxはinstallerがHomebrewの解析送信を無効にして
+   `brew install byobu` で導入します。tmuxは依存として入るため `brew autoremove` の対象のままです。
+2. `sudo` を付けずにinstallerを実行します。installerはrootでの実行を拒否し、Homebrewもrootでは動作しません。
+
+   ```bash
+   git clone https://github.com/atomon/dev_setup.git
+   cd dev_setup/ubuntu
+   bash installer/byobu.sh
+   ```
+
+3. `Alt-a` をprefixとして使うため、端末でOptionをMeta（Alt）として送る設定をします。
+   Ghosttyで左Optionだけを指定すると、右OptionはJISキーボードの `\` など文字入力用に残ります。
+
+   | 端末 | 設定 |
+   |---|---|
+   | Ghostty | 設定ファイルに `macos-option-as-alt = left` を追加して再読み込み（既定は `Cmd+Shift+,`） |
+   | iTerm2 | Left Option keyを `Esc+` |
+   | Terminal.app | 「Optionキーをメタキーとして使用」 |
+
+4. `byobu-resume` は `~/.local/bin` に入りますが、macOSの既定のPATHには含まれません。
+   installerがPATHの案内を表示した場合は `~/.zprofile` に追加するか、`~/.local/bin/byobu-resume` で実行します。
+
+   ```bash
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile
+   ```
+
+| 操作 | キー / コマンド |
+|---|---|
+| 起動 | `byobu`（毎回新規sessionで開始） |
+| prefix | 左Option + `a`（予備の `F12` は `fn` との同時押しが必要な場合があります） |
+| 新規window | `Alt-a c` |
+| 手動保存 | `Alt-a Ctrl-s`（自動保存は3分ごと） |
+| 最後に保存した状態を復元 | tmux serverがない状態で `byobu-resume` |
+
+macOS（Apple Silicon、Homebrewのtmux 3.8、Ghostty）の実機で、導入、`Alt-a` 操作、自動保存、
+`byobu-resume` による復元を確認済みです。
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を
 `${XDG_DATA_HOME:-~/.local/share}/tmux-plugins/` に固定バージョンで導入します。固定バージョンを更新した後の

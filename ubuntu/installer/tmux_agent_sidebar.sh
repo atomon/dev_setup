@@ -80,7 +80,8 @@ main() {
             --output "$binary_temp" "$SIDEBAR_RELEASE_BASE/$binary_name"
         [[ $(sha256_of "$binary_temp") == "$binary_sha256" ]] || \
             die 'tmux-agent-sidebar binary checksum verification failed.'
-        chmod 0755 -- "$binary_temp"
+        # macOS chmod treats -- after the mode as a file name.
+        chmod 0755 "$binary_temp"
         mv -- "$binary_temp" "$real_binary"
         binary_temp=''
     fi
@@ -95,7 +96,7 @@ main() {
 [ "\${1:-}" != hook ] || umask 077
 exec '$real_binary' "\$@"
 EOF
-    chmod 0755 -- "$binary_temp"
+    chmod 0755 "$binary_temp"
     mv -- "$binary_temp" "$binary"
     binary_temp=''
     # The trailing slash makes find descend into macOS's /tmp -> /private/tmp symlink.

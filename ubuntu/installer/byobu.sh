@@ -57,7 +57,8 @@ main() {
     restore_helper="$data_home/byobu-session-restore/restore-after-attach.sh"
     config_file="$HOME/.byobu/.tmux.conf"
     mkdir -p -- "$plugin_root" "$resurrect_dir" "${restore_helper%/*}" "$HOME/.local/bin"
-    chmod 0700 -- "$plugin_root" "$resurrect_dir" "${restore_helper%/*}"
+    # macOS chmod treats -- after the mode as a file name.
+    chmod 0700 "$plugin_root" "$resurrect_dir" "${restore_helper%/*}"
     install -m 0700 -- "$SCRIPT_DIR/utils/byobu_restore_after_attach.sh" "$restore_helper"
     install -m 0700 -- "$SCRIPT_DIR/utils/byobu_resume.sh" "$HOME/.local/bin/byobu-resume"
 
@@ -103,7 +104,7 @@ EOF
         fi
     fi
     if [[ $os == Darwin ]]; then
-        printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = true).'
+        printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = left keeps Right Option for characters such as \ on JIS keyboards).'
     fi
 }
 
