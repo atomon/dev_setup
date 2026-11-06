@@ -167,6 +167,9 @@ macOSのByobuとtmuxは `brew install byobu` で導入し（Homebrewの解析送
 入るため `brew autoremove` の対象のままです。`Alt-a` をprefixとして使うには、端末でOptionをMetaとして
 送る設定が必要です（Ghostty: `macos-option-as-alt = true`、iTerm2: Left Option keyを `Esc+`、
 Terminal.app:「Optionキーをメタキーとして使用」）。`F12` は `fn` との同時押しが必要な場合があります。
+`byobu-resume` は `~/.local/bin` に入りますが、macOSの既定のPATHには含まれないため、`~/.zprofile` に
+`export PATH="$HOME/.local/bin:$PATH"` を追加するか、`~/.local/bin/byobu-resume` で実行します。
+installerはPATHに含まれていない場合に案内を表示します。
 macOSでの動作は実機で未検証です。
 
 Byobu installer は `tmux-resurrect` と `tmux-continuum` を

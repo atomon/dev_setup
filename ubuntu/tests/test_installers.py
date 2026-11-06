@@ -581,6 +581,8 @@ fi''',
             result = run_installer()
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('WARNING: Saved pane contents are unencrypted', result.stdout)
+            self.assertIn(f'NOTE: {home}/.local/bin is not in PATH', result.stdout)
+            self.assertIn('next login', result.stdout)
             config = home / '.byobu/.tmux.conf'
             config_text = config.read_text()
             for line in ('# >>> dev_setup byobu-session-restore >>>', 'set -g mouse on',
@@ -601,16 +603,18 @@ fi''',
                          home / '.local/bin/byobu-resume', data / 'tmux/resurrect'):
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o700)
             self.assertEqual(clone_count(), 2)
-            result = run_installer()
+            result = run_installer(PATH=f'{home}/.local/bin:{env["PATH"]}')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(clone_count(), 2)
             self.assertFalse(list(home.glob('.byobu/.tmux.conf.before-byobu-session-restore.*')))
             self.assertNotIn('macos-option-as-alt', result.stdout)
+            self.assertNotIn('is not in PATH', result.stdout)
 
             calls = len(log.read_text().splitlines())
             result = run_installer(TEST_UNAME='Darwin')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('macos-option-as-alt', result.stdout)
+            self.assertIn('~/.zprofile', result.stdout)
             darwin_calls = log.read_text().splitlines()[calls:]
             self.assertIn('brew install byobu', darwin_calls)
             self.assertFalse([call for call in darwin_calls if call.startswith(('sudo ', 'apt-get '))])

@@ -173,6 +173,14 @@ main() {
     printf '%s\n' 'WARNING: Saved pane contents are unencrypted and can contain credentials or other sensitive data.'
     printf '%s\n' 'AI agent processes are not restarted.'
     printf '%s\n' 'Run byobu-resume to restore the latest saved session; normal byobu-tmux startup is fresh.'
+    if [[ :$PATH: != *":$HOME/.local/bin:"* ]]; then
+        printf 'NOTE: %s is not in PATH; run byobu-resume by its full path or add the directory to PATH.\n' "$HOME/.local/bin"
+        if [[ $os == Darwin ]]; then
+            printf '%s\n' "macOS (zsh): echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zprofile"
+        else
+            printf '%s\n' "Ubuntu's default ~/.profile adds it at the next login."
+        fi
+    fi
     if [[ $os == Darwin ]]; then
         printf '%s\n' 'On macOS, let your terminal send Option as Meta so Alt-a works (Ghostty: macos-option-as-alt = true).'
     fi
