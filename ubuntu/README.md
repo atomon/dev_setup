@@ -298,7 +298,8 @@ arm64（aarch64）では0.2.1の固定コミットからソースビルドしま
 Fcitx 5と `fcitx5-mozc` も導入し、同じ入力基盤上でHazkeyとMozcを比較できます。
 既存のIBusパッケージ・Mozc辞書・GNOME入力ソースは削除しません。
 `im-config -n fcitx5`、`~/.config/environment.d/90-fcitx5.conf`、`~/.pam_environment` によるユーザー設定の変更は再ログイン後に反映されます。
-GNOMEのログインセッションにもFcitx 5の環境変数を渡すため、`~/.pam_environment` を作成します。
+GNOMEのログインセッションにもFcitx 5の環境変数を渡すため、`~/.pam_environment` を作成・更新します。
+既存のロケール設定などの行は保持し、入力関連の変数（`XMODIFIERS`・`GTK_IM_MODULE`・`QT_IM_MODULE`・`SDL_IM_MODULE`）だけを置き換えます。
 既存の `~/.xinputrc`、`~/.config/environment.d/90-fcitx5.conf`、`~/.pam_environment` があれば、変更前に `*.before-hazkey.*` へ保存します。
 `--all` ではHazkeyは導入しません。試す場合は明示的に指定してください。
 
@@ -308,7 +309,7 @@ GNOMEのログインセッションにもFcitx 5の環境変数を渡すため�
 2. Hazkey・Fcitx 5・Mozcを導入します。
 3. 公式GUIと同じZenzaiモデルをダウンロードし、SHA-256を検証します。
 4. 既存のキーボード配列と入力ソースを保持して、Fcitx 5の各グループにHazkey・Mozcを追加します。
-5. `~/.config/environment.d/90-fcitx5.conf` と `~/.pam_environment` を作成し、GTK・Qt・SDL・XIM互換アプリおよびGNOMEログインセッションの入力環境をFcitx 5へ統一します。
+5. `~/.config/environment.d/90-fcitx5.conf` を作成し、`~/.pam_environment` に入力関連の変数を設定して、GTK・Qt・SDL・XIM互換アプリおよびGNOMEログインセッションの入力環境をFcitx 5へ統一します。
 6. Hazkeyの各プロファイルでZenzaiを有効にし、Vulkan GPUが利用できればGPUを選択します。
 
 完了後は作業を保存してログアウト・再ログインしてください。
@@ -322,9 +323,56 @@ Fcitx 5のメニューでHazkeyを選択してください。Mozcにも同じメ
 同じディレクトリの `*.before-hazkey.*` にバックアップします。
 Hazkeyのカスタムキー設定・辞書設定などは保持します。Fcitxの設定ファイルのコメント・整形は再生成されます。
 
+次のオプションは `bash installer/hazkey.sh` に直接指定します（`install.sh -i hazkey` からは指定できません）。
+
+#### キーボード配列を指定する
+
+```bash
+bash installer/hazkey.sh --layout us        # 例: jp、us+dvorak（GNOME表記）、us-dvorak（Fcitx表記）
+```
+
+省略時は、GNOMEの入力ソースにある配列（`xkb`）を引き継ぎます。入力ソースがIBusのエンジン（Mozcなど）だけの場合は
+システム既定の `/etc/default/keyboard` を使います。IBus構成ではGNOMEが `us` を使っていることがあり、
+実際の配列と異なる場合があるため、導入後に配列が変わったら `--layout` を指定して再実行してください。
+指定した配列は既存の全グループの既定配列になり、旧配列の `keyboard-*` 項目は新しい配列に置き換わります
+（その他の `keyboard-*` 項目は保持）。配列名はパッケージの導入前に `/usr/share/X11/xkb/rules/evdev.lst` で確認します。
+GNOME Waylandでは、ログイン時にFcitx 5が自身の配列をGNOMEの入力ソースへ反映します。
+
+#### 入力履歴の学習を無効にする
+
+```bash
+bash installer/hazkey.sh --no-input-history
+```
+
+既定では、確定した変換（読みと表記の組）を `$XDG_STATE_HOME/hazkey/memory/`
+（通常は `~/.local/state/hazkey/memory/`）に保存し、次回以降の候補順に反映します。
+このファイルは端末内だけで使われますが、確定した語句をほぼ平文で含みます。
+`--no-input-history` を付けると全プロファイルで `useInputHistory` を `false` にし、学習データの読み書きを止めます。
+付けずに再実行しても元に戻らず、既存の学習データも削除しません。再度有効にする場合や学習データを削除する場合は
+`hazkey-settings`（削除は「Clear all input history data」）を使ってください。
+
+#### 候補ウィンドウを入力位置に表示する（Kimpanel）
+
+```bash
+bash installer/hazkey.sh --kimpanel
+```
+
+GNOME WaylandではFcitx 5が候補ウィンドウの位置を正しく決められず、入力中の文字に重なることがあります。
+GNOME Shell拡張 [Kimpanel](https://extensions.gnome.org/extension/261/kimpanel/)（`kimpanel@kde.org`）を
+ユーザー単位で導入し、GNOME Shell側に候補ウィンドウを描画させます。sudoは不要です。
+v83（GNOME Shell 45〜47対応）を固定SHA-256で検証して導入し、`org.gnome.shell enabled-extensions` に追加します。
+対応外のGNOME Shellでは、パッケージの導入前に停止します。
+Ghosttyでは画面下端で上に反転した候補ウィンドウが入力行に重なるため、導入後に `panel.js` の位置補正を書き換えます
+（修正前の内容と完全に一致する場合のみ。想定外の内容なら停止）。
+拡張が自動更新されると補正が失われるため、その場合は `--kimpanel` を付けて再実行してください。
+導入前に配布物を確認し、通信や外部コマンド実行のコードがなく、Fcitx 5とはD-Bus（`org.kde.impanel`）でのみ連携することを確認しています。
+GNOME Shell拡張はシェル内で動作し、画面と入力にアクセスできる点に留意してください。
+ユーザー拡張機能が無効化されている環境（`disable-user-extensions`）では警告のみ表示し、その設定は変更しません。
+
 設定ファイルの競合を防ぐため、実行中のFcitx 5とHazkeyサーバーをSIGTERMで終了します。
 実行前に編集中の入力を確定し、設定画面を閉じてください。スクリプトは強制ログアウトしません。
 モデル取得に失敗した場合は、既存モデル・入力方式設定を変更せず停止します。
+導入後、Hazkey関連プロセスに外部通信がないことは `bash installer/utils/hazkey_network_check.sh --help` の手順で確認できます。
 IBusとFcitx 5のデーモンを手動で同時起動したり、`.bashrc` に入力関連の環境変数を一律追記したりしないでください。
 GNOME Waylandでアプリ固有の入力・候補表示の問題がある場合は、`fcitx5-diagnose` と下記の公式資料を確認してください。
 
@@ -368,10 +416,12 @@ GNOME標準のIBus構成へ戻す場合は次を実行し、再ログインし�
 bash installer/mozc.sh
 im-config -n ibus
 rm -f ~/.config/environment.d/90-fcitx5.conf
-rm -f ~/.pam_environment
+# ロケール設定などは残し、Hazkeyスクリプトが追加した入力関連の行だけを削除
+sed -i -E '/^# Use Fcitx5 for GTK/d; /^(XMODIFIERS|GTK_IM_MODULE|QT_IM_MODULE|SDL_IM_MODULE)[[:space:]=]/d' ~/.pam_environment
 ```
 
 GNOMEの「設定 → キーボード → 入力ソース」でMozcを選択します。
+`--kimpanel` で導入した拡張は `gnome-extensions uninstall kimpanel@kde.org` で削除できます。
 Hazkeyスクリプトが作成した `~/.config/autostart/fcitx5.desktop` も不要なら削除し、別途Fcitx 5を自動起動に登録した場合は、そちらも解除してください。
 導入前の入力方式設定そのものへ戻したい場合は、保存した `.xinputrc.before-hazkey.*` の該当ファイルを `.xinputrc` に復元します。
 導入前に `.xinputrc` がなかった場合は `im-config -n default` でディストリビューションの既定設定に戻せます。
@@ -398,8 +448,8 @@ aarch64実機でのコンパイル・入力動作は未検証です。
 入力方式の共通処理（Ubuntu GNOMEの確認、APT操作、Fcitx 5の選択）は
 `installer/utils/input_method.sh` にまとめています。
 `installer/hazkey.sh` は事前確認、amd64用deb取得、arm64ビルド、導入後の設定を関数に分けています。
-`hazkey_constants.sh` にリリース、CMake、Zenzaiモデルのバージョンと検証値を集約しています。
-`hazkey_toolchain.sh` がSwift・CMake、`hazkey_setup.sh` がモデル取得・プロセス停止、
+`hazkey_constants.sh` にリリース、CMake、Zenzaiモデルのバージョンと検証値を集約しています（Kimpanelの固定値は `hazkey_kimpanel.sh`）。
+`hazkey_toolchain.sh` がSwift・CMake、`hazkey_setup.sh` がモデル取得・プロセス停止、`hazkey_kimpanel.sh` がKimpanelの導入、
 `configure_hazkey.py` が既存ユーザー設定の読み込み・検証・更新を担当します。
 Hazkey導入時には `vulkan-tools` も導入し、Vulkan GPUを検出できればZenzaiを
 `Vulkan0` などのGPUバックエンドへ自動設定します。複数GPUでは離散GPUを優先します。

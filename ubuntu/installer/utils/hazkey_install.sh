@@ -2,9 +2,12 @@
 # Install Hazkey and its runtime. Configuration is handled by hazkey_setup.sh.
 
 hazkey_usage() {
-    echo 'Usage: bash installer/hazkey.sh'
+    echo 'Usage: bash installer/hazkey.sh [--no-input-history] [--layout 配列] [--kimpanel]'
     echo 'Hazkey + Fcitx 5 + Mozcを導入し、入力ソース登録とZenzaiの設定を自動で行います。'
     echo 'amd64: 公式deb / arm64: Swift・CMakeが不足していれば自動導入してビルド'
+    echo '  --no-input-history  全プロファイルで入力履歴の学習を無効化（既存の学習データは削除しません）'
+    echo '  --layout 配列       Fcitx 5のキーボード配列を指定（例: us, jp, us+dvorak）。省略時は自動判定'
+    echo '  --kimpanel          GNOME Shell拡張Kimpanelを導入し、候補ウィンドウを入力位置に表示'
 }
 
 hazkey_assert_source_install_is_safe() {
@@ -18,7 +21,7 @@ hazkey_download_deb() {
 
     ime_install_packages curl ca-certificates
     hazkey_fetch "${HAZKEY_REPOSITORY}/releases/download/$HAZKEY_VERSION/$HAZKEY_DEB_ASSET" "$destination"
-    printf '%s  %s\n' "$HAZKEY_SHA256" "$destination" | sha256sum --check --status
+    hazkey_verify_sha256 "$HAZKEY_SHA256" "$destination"
 }
 
 hazkey_install_runtime() {

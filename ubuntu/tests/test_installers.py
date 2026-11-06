@@ -44,6 +44,12 @@ printf 'GPU0:\n    deviceType = PHYSICAL_DEVICE_TYPE_DISCRETE_GPU\n'
 else
 printf 'GPU0:\n    deviceType = PHYSICAL_DEVICE_TYPE_CPU\n'
 fi''',
+            'gnome-shell': 'echo "GNOME Shell ${TEST_SHELL:-46.0}"',
+            'gnome-extensions': ':',
+            'gsettings': '''case "$1 $3" in
+'get disable-user-extensions') echo "${TEST_USER_EXTENSIONS_DISABLED:-false}" ;;
+'get enabled-extensions') echo "${TEST_EXTENSIONS:-@as []}" ;;
+esac''',
         }
         for name, body in mocks.items():
             p = self.bin / name
@@ -83,24 +89,124 @@ hazkey_main
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('autostart', self.log.read_text())
 
-    def test_backend_is_detected_once_and_shared_by_install_and_configuration(self):
-        command = '''source "$1"
+    def run_function(self, name: str, **changes: str) -> subprocess.CompletedProcess[str]:
+        """hazkey.sh を読み込んだ上での単一関数の実行（ログは初期化）"""
+        self.log.write_text('')
+        return subprocess.run(['bash', '-c', f'source "$1"; {name}', 'test',
+                               str(ROOT / 'installer/hazkey.sh')],
+                              env=self.env | changes, capture_output=True, text=True, check=False)
+
+    def hazkey_main_steps(self, *args: str, **changes: str) -> subprocess.CompletedProcess[str]:
+        """hazkey_main の各段階をスタブ化し、引数解析・段階の順序・設定への引数を記録"""
+        command = '''source "$1"; shift
         ime_require_session() { :; }
         ime_update_packages() { :; }
         ime_install_packages() { :; }
         hazkey_select_zenzai_backend() { echo detect >> "$TEST_LOG"; printf '%s\\n' Vulkan0; }
         hazkey_install() { printf 'install %s %s\\n' "$@" >> "$TEST_LOG"; }
-        hazkey_configure_user() { printf 'configure %s\\n' "$1" >> "$TEST_LOG"; }
+        hazkey_configure_user() { printf 'configure %s\\n' "$*" >> "$TEST_LOG"; }
         hazkey_configure_input_method() { :; }
+        hazkey_install_kimpanel() { echo kimpanel >> "$TEST_LOG"; }
         hazkey_print_next_steps() { :; }
-        hazkey_main
+        hazkey_main "$@"
 '''
-        result = subprocess.run(['bash', '-c', command, 'test', str(ROOT / 'installer/hazkey.sh')],
-                                env=self.env, capture_output=True, text=True)
+        self.log.write_text('')
+        # --layout の configure_hazkey.py --check による実環境の ~/.config 参照の防止
+        env = self.env | {'XDG_CONFIG_HOME': str(self.work / 'config')} | changes
+        return subprocess.run(['bash', '-c', command, 'test', str(ROOT / 'installer/hazkey.sh'), *args],
+                              env=env, capture_output=True, text=True, check=False)
+
+    def test_backend_is_detected_once_and_shared_by_install_and_configuration(self):
+        result = self.hazkey_main_steps()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.log.read_text().splitlines(),
                          ['dpkg --print-architecture', 'detect', 'install arm64 Vulkan0',
                           'configure Vulkan0'])
+
+    def test_options_reach_configuration(self):
+        for args, expected in ((('--no-input-history',), 'configure Vulkan0 --no-input-history'),
+                               (('--layout', 'us'), 'configure Vulkan0 --layout us'),
+                               (('--layout=us+dvorak', '--no-input-history'),
+                                'configure Vulkan0 --layout us+dvorak --no-input-history')):
+            with self.subTest(args=args):
+                result = self.hazkey_main_steps(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                log = self.log.read_text()
+                self.assertIn(expected, log.splitlines())
+                self.assertNotIn('kimpanel', log)
+        # Kimpanel はユーザー設定の後に導入
+        result = self.hazkey_main_steps('--kimpanel')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.log.read_text().splitlines()[-2:], ['configure Vulkan0', 'kimpanel'])
+
+    def test_invalid_options_stop_before_any_change(self):
+        # 'xx' は形式上正しいが XKB に存在しない配列、48 は Kimpanel の対応外の GNOME Shell
+        for args, changes in ((('--no-input-history', '--bogus'), {}), (('--layout',), {}),
+                              (('--layout=',), {}), (('--layout', 'US'), {}),
+                              (('--layout', 'us;rm'), {}), (('--layout', 'xx'), {}),
+                              (('--kimpanel',), {'TEST_SHELL': '48.1'})):
+            with self.subTest(args=args):
+                result = self.hazkey_main_steps(*args, **changes)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                log = self.log.read_text()
+                self.assertNotIn('dpkg', log)
+                self.assertNotIn('configure', log)
+
+    KIMPANEL_ORIGINAL = '        if (h == 0) {\n            h = 20;\n            y = y - 20;\n        }\n'
+    KIMPANEL_PATCHED = '        if (h <= 1) {\n            h = 24;\n            y = y - 24;\n        }\n'
+
+    def kimpanel_panel(self, block: str = KIMPANEL_ORIGINAL) -> Path:
+        """gnome-extensions 導入後を模した panel.js"""
+        panel = self.work / 'data/gnome-shell/extensions/kimpanel@kde.org/panel.js'
+        panel.parent.mkdir(parents=True, exist_ok=True)
+        panel.write_text(f'before\n{block}after\n')
+        return panel
+
+    def test_kimpanel_is_verified_installed_and_patched(self):
+        panel = self.kimpanel_panel()
+        # 2 回目は修正済みのまま変化なし
+        for _ in range(2):
+            result = self.run_function('hazkey_install_kimpanel')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            log = self.log.read_text()
+            self.assertIn('version_tag=57768', log)
+            self.assertRegex(log, r'gnome-extensions install --force \S+/kimpanel\.zip')
+            self.assertEqual(panel.read_text(), f'before\n{self.KIMPANEL_PATCHED}after\n')
+
+    def test_kimpanel_is_enabled_for_next_login(self):
+        uuid = "'kimpanel@kde.org'"
+        cases = (
+            ({'TEST_EXTENSIONS': "['ding@rastersoft.com']"},
+             f"enabled-extensions ['ding@rastersoft.com', {uuid}]"),
+            ({'TEST_EXTENSIONS': '@as []'}, f'enabled-extensions [{uuid}]'),
+            ({'TEST_EXTENSIONS': f"[{uuid}]"}, None),
+            # disable-user-extensions は警告のみ
+            ({'TEST_USER_EXTENSIONS_DISABLED': 'true'}, f'enabled-extensions [{uuid}]'),
+        )
+        for changes, expected in cases:
+            with self.subTest(changes=changes):
+                result = self.run_function('hazkey_enable_kimpanel', **changes)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                sets = [line for line in self.log.read_text().splitlines()
+                        if line.startswith('gsettings set')]
+                self.assertEqual(sets, [f'gsettings set org.gnome.shell {expected}'] if expected else [])
+                self.assertEqual('注意' in result.stderr, 'TEST_USER_EXTENSIONS_DISABLED' in changes)
+
+    def test_kimpanel_stops_on_bad_hash_unsupported_shell_or_unknown_panel(self):
+        unknown = '        if (h < 5) {}\n'
+        for changes, block, downloaded in (({'TEST_BAD_HASH': 'yes'}, self.KIMPANEL_ORIGINAL, True),
+                                           ({'TEST_SHELL': '48.1'}, self.KIMPANEL_ORIGINAL, False),
+                                           ({}, unknown, True)):
+            with self.subTest(changes=changes, block=block):
+                panel = self.kimpanel_panel(block)
+                result = self.run_function('hazkey_install_kimpanel', **changes)
+                self.assertNotEqual(result.returncode, 0)
+                log = self.log.read_text()
+                self.assertEqual('curl ' in log, downloaded)
+                self.assertEqual('gnome-extensions' in log, block == unknown)
+                self.assertNotIn('gsettings set', log)
+                self.assertEqual(panel.read_text(), f'before\n{block}after\n')
 
     def test_autostart_entry_is_installed_for_xdg_config_home(self):
         config_home = self.work / 'config'
@@ -170,6 +276,20 @@ hazkey_main
         backups = list(home.glob('.pam_environment.before-hazkey.*'))
         self.assertEqual(len(backups), 1)
         self.assertEqual(backups[0].read_text(), original)
+
+    def test_login_environment_keeps_existing_entries(self):
+        home = self.work / 'home'
+        home.mkdir()
+        pam_environment = home / '.pam_environment'
+        locale = 'LANG\tDEFAULT=en_US.UTF-8\nLC_TIME\tDEFAULT=en_GB.UTF-8\n'
+        pam_environment.write_text(locale + 'QT_IM_MODULE OVERRIDE=ibus\nGTK_IM_MODULE=ibus\n')
+        for _ in range(2):
+            result = self.run_function('ime_configure_login_environment', HOME=str(home))
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(pam_environment.read_text(),
+                         locale + (ROOT / 'installer/DB/fcitx5-pam_environment').read_text())
+        # 2 回目は変更なしのため、バックアップの増加なし
+        self.assertEqual(len(list(home.glob('.pam_environment.before-hazkey.*'))), 1)
 
     def test_arm_build_enables_vulkan_for_a_detected_gpu(self):
         result = self.hazkey(TEST_VULKAN_GPU='yes')
