@@ -71,7 +71,8 @@ main() {
         --output "$binary_temp" "$SIDEBAR_RELEASE_BASE/$binary_name"
     printf '%s  %s\n' "$binary_sha256" "$binary_temp" | sha256sum --check --status || \
         die 'tmux-agent-sidebar binary checksum verification failed.'
-    chmod 0755 -- "$binary_temp"
+    # macOS chmod treats -- after the mode as a file name.
+    chmod 0755 "$binary_temp"
     mv -- "$binary_temp" "$install_dir/bin/tmux-agent-sidebar"
     binary_temp=''
 
