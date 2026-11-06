@@ -580,6 +580,7 @@ fi''',
             config = home / '.byobu/.tmux.conf'
             config_text = config.read_text()
             for line in ('# >>> dev_setup byobu-session-restore >>>', 'set -g mouse on',
+                         'set -g prefix M-a', 'unbind-key -n C-a', 'bind-key M-a send-prefix',
                          'set -s extended-keys on', 'set -sq extended-keys-format csi-u',
                          "set -s terminal-features[100] 'xterm-ghostty:extkeys'",
                          f"set -g @resurrect-dir '{data}/tmux/resurrect'",

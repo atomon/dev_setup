@@ -182,8 +182,10 @@ GhosttyからByobu/tmux内のCodexへShift+Enterを区別して渡せるよう�
 対応をtmuxへ宣言し、CSI u形式で動的に有効化します。Codex側ではShift+Enterを改行へ割り当てて使用できます。
 CSI u形式の指定（`extended-keys-format`）はtmux 3.5以降だけで有効で、tmux 3.4（Ubuntu 24.04）では
 無視され、tmux既定の形式で送られます。
-手動保存は `Ctrl-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
-`byobu-resume` を実行します。`Ctrl-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
+prefixはshellの行頭移動（`Ctrl-a`）と衝突しない `Alt-a` に変更し、Byobu既定の `F12` も予備として残します。
+`Alt-a` 自体をアプリへ送るときは `Alt-a` を2回押します。
+手動保存は `Alt-a Ctrl-s` です。最後に保存された状態を復元するときは、tmux serverがない状態で
+`byobu-resume` を実行します。`Alt-a Ctrl-r` は起動済みserver内でのtmux-resurrect標準操作です。
 
 tmux-agent-sidebar v0.13.0 は
 `${XDG_DATA_HOME:-~/.local/share}/tmux-agent-sidebar` に導入し、リリースバイナリの
@@ -195,7 +197,7 @@ SHA-256とソースの固定commitを検証します。Byobu設定は `~/.byobu/
 ByobuのScreen backendは対象外です。sidebarは新規windowに自動作成されます。下部の
 Activity/Gitパネルは20行で表示され、sidebar内で `Shift+Tab` を押すと切り替えられます。
 通知は初期状態で無効です。既存windowにも表示するには `byobu-tmux` を起動して
-`Ctrl-a E` を押してください（大文字の `E`）。
+`Alt-a E`（`F12 E` でも可）を押してください（大文字の `E`）。
 
 agent連携は別スクリプトで、必要なものだけ有効にします。
 

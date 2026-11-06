@@ -102,6 +102,9 @@ main() {
         END {
             print "# >>> dev_setup byobu-session-restore >>>"
             print "set -g mouse on"
+            print "set -g prefix M-a"
+            print "unbind-key -n C-a"
+            print "bind-key M-a send-prefix"
             print "set -s extended-keys on"
             print "set -sq extended-keys-format csi-u"
             print "set -s terminal-features[100] \047xterm-ghostty:extkeys\047"
