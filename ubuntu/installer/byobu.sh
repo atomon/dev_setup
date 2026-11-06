@@ -19,14 +19,16 @@ die() {
     exit 1
 }
 
-# Only an untouched checkout of the same upstream is replaced; anything else
+# Only an untouched checkout of the same upstream is replaced: no local changes
+# and no commits (stashes included) that exist only locally. Anything else
 # stays for the user.
 is_pristine_checkout() {
-    local directory=$1 repository=$2 changes
+    local directory=$1 repository=$2 changes local_commits
 
     [[ $(git -C "$directory" remote get-url origin 2>/dev/null || true) == "$repository" ]] || return 1
     changes=$(git -C "$directory" status --porcelain 2>/dev/null) || return 1
-    [[ -z $changes ]]
+    local_commits=$(git -C "$directory" rev-list --count --all --not --remotes --tags 2>/dev/null) || return 1
+    [[ -z $changes && $local_commits == 0 ]]
 }
 
 install_plugin() {
@@ -37,7 +39,7 @@ install_plugin() {
         [[ -d $destination/.git ]] || die "$destination exists but is not a Git checkout."
         [[ $(git -C "$destination" rev-parse HEAD 2>/dev/null || true) != "$commit" ]] || return 0
         is_pristine_checkout "$destination" "$repository" || \
-            die "$destination is not the expected $version and has local changes or another origin; preserve it or move it before installing."
+            die "$destination is not the expected $version and has local changes, local-only commits, or another origin; preserve it or move it before installing."
     fi
 
     work=$(mktemp -d "$plugin_root/.${name}.XXXXXX") || die "Could not create a temporary $name directory."

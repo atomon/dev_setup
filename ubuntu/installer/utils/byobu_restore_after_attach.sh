@@ -13,8 +13,9 @@ tmux set-environment -gu DEV_SETUP_BYOBU_RESUME_SESSION
 # Automatic saving stays paused on failure so an empty session cannot replace
 # the saved one; tell the user unless the restore completes and clears this.
 trap 'tmux display-message -d 0 "byobu-resume: restore did not finish; automatic saving stays paused to protect the saved session." 2>/dev/null || true' EXIT
-[[ ${1:-} =~ ^[1-9][0-9]*$ ]] || exit 1
-save_interval=$1
+# Hooks written by older installers pass no interval; they always used 3 minutes.
+save_interval=${1:-3}
+[[ $save_interval =~ ^[1-9][0-9]*$ ]] || exit 1
 
 resurrect_dir=$(tmux show-option -gqv @resurrect-dir)
 restore_script=$(tmux show-option -gqv @resurrect-restore-script-path)

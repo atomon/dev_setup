@@ -555,6 +555,8 @@ elif [[ $1 == -C && $3 == remote ]]; then
     echo "https://github.com/tmux-plugins/${2##*/}.git"
 elif [[ $1 == -C && $3 == status ]]; then
     printf '%s' "${TEST_PLUGIN_STATUS:-}"
+elif [[ $1 == -C && $3 == rev-list ]]; then
+    echo "${TEST_PLUGIN_LOCAL_COMMITS:-0}"
 fi''',
             }
             for name, body in mocks.items():
@@ -614,7 +616,12 @@ fi''',
 
             result = run_installer(TEST_PLUGIN_COMMIT='old', TEST_PLUGIN_STATUS=' M resurrect.tmux')
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn('has local changes or another origin', result.stderr)
+            self.assertIn('has local changes, local-only commits, or another origin', result.stderr)
+            self.assertTrue(marker.exists())
+
+            result = run_installer(TEST_PLUGIN_COMMIT='old', TEST_PLUGIN_LOCAL_COMMITS='1')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('local-only commits', result.stderr)
             self.assertTrue(marker.exists())
 
             clones = clone_count()
@@ -633,16 +640,21 @@ fi''',
         with tempfile.TemporaryDirectory() as temp:
             env = self.restore_env(Path(temp), 'state\t1\t\n')
             log = Path(env['TEST_TMUX_LOG'])
-            result = self.run_restore(env, '5')
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(Path(env['TEST_RESTORED']).exists())
-            calls = log.read_text()
-            self.assertIn('rename-session -t =2 1', calls)
-            self.assertIn('set-option -g @continuum-save-interval 5', calls)
-            self.assertNotIn('display-message', calls)
+            restored = Path(env['TEST_RESTORED'])
+            for args, interval in ((('5',), '5'), ((), '3')):
+                with self.subTest(args=args):
+                    restored.unlink(missing_ok=True)
+                    log.write_text('')
+                    result = self.run_restore(env, *args)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(restored.exists())
+                    calls = log.read_text()
+                    self.assertIn('rename-session -t =2 1', calls)
+                    self.assertIn(f'set-option -g @continuum-save-interval {interval}', calls)
+                    self.assertNotIn('display-message', calls)
 
             Path(env['TEST_RESTORE']).write_text('#!/usr/bin/env bash\nexit 42\n')
-            for args, returncode in ((('5',), 42), ((), 1)):
+            for args, returncode in ((('5',), 42), (('x',), 1)):
                 with self.subTest(args=args):
                     log.write_text('')
                     result = self.run_restore(env, *args)
