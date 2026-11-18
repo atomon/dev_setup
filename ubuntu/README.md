@@ -7,7 +7,7 @@ sudo apt update && sudo apt install git
 
 ## Clone repository
 ```bash
-mkdir -p Documents/Github
+mkdir -p ~Documents/Github && cd $_
 git clone https://github.com/atomon/dev_setup.git
 ```
 
